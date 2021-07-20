@@ -23,6 +23,10 @@ type CfgServ struct {
 	ShutdownTimeout time.Duration `json:"shutdown-timeout" yaml:"shutdown-timeout"`
 }
 
+type CfgNode struct {
+	AddrGRPC string `json:"addr-grpc" yaml:"addr-grpc"`
+}
+
 // Config is common service settings.
 type Config struct {
 	CfgServ `json:"webserver" yaml:"webserver"`
@@ -41,7 +45,14 @@ var cfg = Config{ // inits default values:
 	},
 }
 
-const cfgfile = "dfs-fe.yaml"
+var nodes = []string{
+	"localhost:50050",
+}
+
+const (
+	cfgfile   = "dfs-front.yaml"
+	nodesfile = "dfs-nodes.yaml"
+)
 
 // ConfigPath determines configuration path, depended on what directory is exist.
 var ConfigPath string

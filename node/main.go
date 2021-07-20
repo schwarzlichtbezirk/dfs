@@ -11,11 +11,7 @@ func main() {
 		log.Println("shutting down by break begin")
 	}()
 
-	makeServerLabel("DFS", "0.1.0")
-
-	var gmux = NewRouter()
-	RegisterRoutes(gmux)
-	Run(gmux)
+	Run()
 	WaitExit()
 	log.Println("shutting down complete.")
 }

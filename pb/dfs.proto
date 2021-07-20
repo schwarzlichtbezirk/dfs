@@ -3,19 +3,49 @@ option go_package = "github.com/schwarzlichtbezirk/dfs/pb";
 
 package dfs;
 
+// DataGuide is the service for working with file chunks.
+service DataGuide {
+	// GetProp returns properties of stored file chunk.
+	// Returns empty struct if no such chunk is present.
+	rpc GetProp(FileID) returns (Prop) {}
+	// Read creates reading streaming by dividing big chunk to serie of small chunks.
+	rpc Read (Param) returns (stream Chunk) {}
+	// Write receives serie of small chunks and glue them into big one.
+	rpc Write (stream Chunk) returns (Summary) {}
+}
+
+// FileID is ID of file.
+message FileID {
+	int64 id = 1;
+}
+
+// Prop contains full information about chunk.
+message Prop {
+	int64 id = 1;
+	int64 size = 2; // full size of file
+	int64 from = 3; // chunk start in file
+	int64 to = 4; // chunk end in file
+	string mime = 5; // MIME content type
+}
+
+// Chunk body.
 message Chunk {
-	int64 fileID = 1;
+	Prop prop = 1;
 	bytes value = 2;
 }
 
-// Summary result of chunks streaming.
-message Summary {
-	// The number of chunks received.
-	int32 chunk_count = 1;
-	// The duration of the traversal in milliseconds.
-	int32 elapsed_time = 2;
+// Param is parameters for read streaming.
+message Param {
+	// Maximum size of chunks.
+	int32 chunk_size = 1;
 }
 
-service DataGuide {
-	rpc Write (stream Chunk) returns (Summary) {}
+// Summary result of chunks write streaming.
+message Summary {
+	// The duration of the traversal in milliseconds.
+	int32 elapsed_time = 1;
+	// The number of chunks received.
+	int32 chunk_count = 2;
 }
+
+// The end.

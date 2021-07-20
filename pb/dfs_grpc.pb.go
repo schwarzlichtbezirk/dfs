@@ -22,6 +22,12 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type DataGuideClient interface {
+	// GetProp returns properties of stored file chunk.
+	// Returns empty struct if no such chunk is present.
+	GetProp(ctx context.Context, in *FileID, opts ...grpc.CallOption) (*Prop, error)
+	// Read creates reading streaming by dividing big chunk to serie of small chunks.
+	Read(ctx context.Context, in *Param, opts ...grpc.CallOption) (DataGuide_ReadClient, error)
+	// Write receives serie of small chunks and glue them into big one.
 	Write(ctx context.Context, opts ...grpc.CallOption) (DataGuide_WriteClient, error)
 }
 
@@ -33,8 +39,49 @@ func NewDataGuideClient(cc grpc.ClientConnInterface) DataGuideClient {
 	return &dataGuideClient{cc}
 }
 
+func (c *dataGuideClient) GetProp(ctx context.Context, in *FileID, opts ...grpc.CallOption) (*Prop, error) {
+	out := new(Prop)
+	err := c.cc.Invoke(ctx, "/dfs.DataGuide/GetProp", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *dataGuideClient) Read(ctx context.Context, in *Param, opts ...grpc.CallOption) (DataGuide_ReadClient, error) {
+	stream, err := c.cc.NewStream(ctx, &DataGuide_ServiceDesc.Streams[0], "/dfs.DataGuide/Read", opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &dataGuideReadClient{stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+type DataGuide_ReadClient interface {
+	Recv() (*Chunk, error)
+	grpc.ClientStream
+}
+
+type dataGuideReadClient struct {
+	grpc.ClientStream
+}
+
+func (x *dataGuideReadClient) Recv() (*Chunk, error) {
+	m := new(Chunk)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
 func (c *dataGuideClient) Write(ctx context.Context, opts ...grpc.CallOption) (DataGuide_WriteClient, error) {
-	stream, err := c.cc.NewStream(ctx, &DataGuide_ServiceDesc.Streams[0], "/dfs.DataGuide/Write", opts...)
+	stream, err := c.cc.NewStream(ctx, &DataGuide_ServiceDesc.Streams[1], "/dfs.DataGuide/Write", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -71,6 +118,12 @@ func (x *dataGuideWriteClient) CloseAndRecv() (*Summary, error) {
 // All implementations must embed UnimplementedDataGuideServer
 // for forward compatibility
 type DataGuideServer interface {
+	// GetProp returns properties of stored file chunk.
+	// Returns empty struct if no such chunk is present.
+	GetProp(context.Context, *FileID) (*Prop, error)
+	// Read creates reading streaming by dividing big chunk to serie of small chunks.
+	Read(*Param, DataGuide_ReadServer) error
+	// Write receives serie of small chunks and glue them into big one.
 	Write(DataGuide_WriteServer) error
 	mustEmbedUnimplementedDataGuideServer()
 }
@@ -79,6 +132,12 @@ type DataGuideServer interface {
 type UnimplementedDataGuideServer struct {
 }
 
+func (UnimplementedDataGuideServer) GetProp(context.Context, *FileID) (*Prop, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetProp not implemented")
+}
+func (UnimplementedDataGuideServer) Read(*Param, DataGuide_ReadServer) error {
+	return status.Errorf(codes.Unimplemented, "method Read not implemented")
+}
 func (UnimplementedDataGuideServer) Write(DataGuide_WriteServer) error {
 	return status.Errorf(codes.Unimplemented, "method Write not implemented")
 }
@@ -93,6 +152,45 @@ type UnsafeDataGuideServer interface {
 
 func RegisterDataGuideServer(s grpc.ServiceRegistrar, srv DataGuideServer) {
 	s.RegisterService(&DataGuide_ServiceDesc, srv)
+}
+
+func _DataGuide_GetProp_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(FileID)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DataGuideServer).GetProp(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/dfs.DataGuide/GetProp",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DataGuideServer).GetProp(ctx, req.(*FileID))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _DataGuide_Read_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(Param)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(DataGuideServer).Read(m, &dataGuideReadServer{stream})
+}
+
+type DataGuide_ReadServer interface {
+	Send(*Chunk) error
+	grpc.ServerStream
+}
+
+type dataGuideReadServer struct {
+	grpc.ServerStream
+}
+
+func (x *dataGuideReadServer) Send(m *Chunk) error {
+	return x.ServerStream.SendMsg(m)
 }
 
 func _DataGuide_Write_Handler(srv interface{}, stream grpc.ServerStream) error {
@@ -127,8 +225,18 @@ func (x *dataGuideWriteServer) Recv() (*Chunk, error) {
 var DataGuide_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "dfs.DataGuide",
 	HandlerType: (*DataGuideServer)(nil),
-	Methods:     []grpc.MethodDesc{},
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "GetProp",
+			Handler:    _DataGuide_GetProp_Handler,
+		},
+	},
 	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "Read",
+			Handler:       _DataGuide_Read_Handler,
+			ServerStreams: true,
+		},
 		{
 			StreamName:    "Write",
 			Handler:       _DataGuide_Write_Handler,
