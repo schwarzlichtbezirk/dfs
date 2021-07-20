@@ -1,0 +1,21 @@
+syntax = "proto3";
+option go_package = "github.com/schwarzlichtbezirk/dfs/pb";
+
+package dfs;
+
+message Chunk {
+	int64 fileID = 1;
+	bytes value = 2;
+}
+
+// Summary result of chunks streaming.
+message Summary {
+	// The number of chunks received.
+	int32 chunk_count = 1;
+	// The duration of the traversal in milliseconds.
+	int32 elapsed_time = 2;
+}
+
+service DataGuide {
+	rpc Write (stream Chunk) returns (Summary) {}
+}
