@@ -25,7 +25,7 @@ func Run() {
 
 	// get port
 	if err = DetectPort(); err != nil {
-		log.Fatal(err)
+		log.Printf("used default port %s", cfg.PortGRPC)
 	}
 
 	// starts gRPC servers

@@ -155,6 +155,8 @@ func RegisterRoutes(gmux *Router) {
 	api.Path("/ping").HandlerFunc(pingAPI)
 	api.Path("/nodesize").HandlerFunc(nodesizeAPI)
 	api.Path("/upload").Methods("POST", "PUT").HandlerFunc(uploadAPI)
+	api.Path("/download").HandlerFunc(downloadAPI)
 	api.Path("/fileinfo").HandlerFunc(fileinfoAPI)
 	api.Path("/remove").HandlerFunc(removeAPI)
+	api.Path("/addnode").HandlerFunc(addnodeAPI)
 }

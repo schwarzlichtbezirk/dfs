@@ -1,10 +1,26 @@
 package main
 
 import (
+	"context"
+	"errors"
+	"io"
+	"log"
+	"mime/multipart"
 	"sync"
+	"sync/atomic"
 
 	"github.com/schwarzlichtbezirk/dfs/pb"
+	"google.golang.org/grpc"
 )
+
+// FileInfo is file information about chunks placed at nodes.
+type FileInfo struct {
+	FileID int64       `json:"file_id"`
+	Name   string      `json:"name"`
+	Size   int64       `json:"size"`
+	MIME   string      `json:"mime"`
+	Chunks []*pb.Range `json:"chunks"`
+}
 
 type NodeInfo struct {
 	// Client is gRPC client.
@@ -17,51 +33,252 @@ type NodeInfo struct {
 	NumChunks int
 }
 
-// Nodes is list of available nodes with information about them.
-var Nodes []NodeInfo
-
-// mutex for Nodes array access.
-var nodmux sync.RWMutex
-
-// Storage is singleton, files database with fileID/FileInfo keys/values.
-var storage sync.Map
-
-// idconter is file ID counter.
-var idconter int64
-
-// FileInfo is file information about chunks placed at nodes.
-type FileInfo struct {
-	FileID int64       `json:"file_id"`
-	Name   string      `json:"name"`
-	Size   int64       `json:"size"`
-	MIME   string      `json:"mime"`
-	Chunks []*pb.Range `json:"chunks"`
+type Storage struct {
+	// idconter is files ID counter.
+	// Each stored file will have unique ID, and can have not unique file name.
+	idconter int64
+	// Nodes is list of available nodes with information about them.
+	Nodes []*NodeInfo
+	// mutex for Nodes array access.
+	nodmux sync.RWMutex
+	// FIMap is files database with fileID/FileInfo keys/values.
+	FIMap sync.Map
 }
 
-// NodesAdd adds file information to nodes storage.
-func (fi *FileInfo) NodesAdd() {
-	// update statistics
-	nodmux.Lock()
-	for _, rng := range fi.Chunks {
-		Nodes[rng.NodeId].NumChunks++
-		Nodes[rng.NodeId].SumSize += rng.To - rng.From
+// Storage is singleton
+var storage Storage
+
+func (node *NodeInfo) RunGRPC() {
+	exitwg.Add(1)
+	grpcwg.Add(1)
+	go func() {
+		defer exitwg.Done()
+
+		var conn *grpc.ClientConn
+		var ok bool
+
+		func() {
+			defer grpcwg.Done()
+
+			var err error
+			log.Printf("grpc connection wait on %s\n", node.Addr)
+			var ctx, cancel = context.WithCancel(context.Background())
+			go func() {
+				defer cancel()
+				if conn, err = grpc.DialContext(ctx, node.Addr, grpc.WithInsecure(), grpc.WithBlock()); err != nil {
+					log.Fatalf("fail to dial on %s: %v", node.Addr, err)
+				}
+				node.Client = pb.NewDataGuideClient(conn)
+			}()
+			// wait until connect will be established or have got exit signal
+			select {
+			case <-ctx.Done():
+				log.Printf("grpc connection established on %s\n", node.Addr)
+				ok = true
+			case <-exitchan:
+				log.Printf("grpc connection canceled on %s\n", node.Addr)
+			}
+		}()
+
+		if ok {
+			defer conn.Close()
+			// wait for exit signal
+			<-exitchan
+
+			if err := conn.Close(); err != nil {
+				log.Printf("grpc disconnect on %s: %v\n", node.Addr, err)
+			} else {
+				log.Printf("grpc disconnected on %s\n", node.Addr)
+			}
+		}
+	}()
+}
+
+func (s *Storage) MakeFileInfo(handler *multipart.FileHeader) (info *FileInfo) {
+	// make file ID
+	var fid = atomic.AddInt64(&s.idconter, 1)
+	// extract MIME type
+	var mime = "N/A"
+	if ct, ok := handler.Header["Content-Type"]; ok && len(ct) > 0 {
+		mime = ct[0]
 	}
-	nodmux.Unlock()
+	// inits file info
+	info = &FileInfo{
+		FileID: fid,
+		Name:   handler.Filename,
+		Size:   handler.Size,
+		MIME:   mime,
+	}
+	return
+}
+
+func (s *Storage) NewReader(fi *FileInfo) io.ReadSeeker {
+	return &NodesReader{s, fi, 0}
+}
+
+// AddFileInfo adds file information to nodes storage.
+func (s *Storage) AddFileInfo(fi *FileInfo) {
+	// update statistics
+	s.nodmux.Lock()
+	for _, rng := range fi.Chunks {
+		s.Nodes[rng.NodeId].NumChunks++
+		s.Nodes[rng.NodeId].SumSize += rng.To - rng.From
+	}
+	s.nodmux.Unlock()
 
 	// add itself
-	storage.Store(fi.FileID, fi)
+	s.FIMap.Store(fi.FileID, fi)
 }
 
-// NodesDel deletes file information from nodes storage.
-func (fi *FileInfo) NodesDel() {
+// DelFileInfo deletes file information from nodes storage.
+func (s *Storage) DelFileInfo(fi *FileInfo) {
 	// delete itself
-	storage.Delete(fi.FileID)
+	s.FIMap.Delete(fi.FileID)
 
 	// update statistics
-	nodmux.Lock()
+	s.nodmux.Lock()
 	for _, rng := range fi.Chunks {
-		Nodes[rng.NodeId].NumChunks--
-		Nodes[rng.NodeId].SumSize -= rng.To - rng.From
+		s.Nodes[rng.NodeId].NumChunks--
+		s.Nodes[rng.NodeId].SumSize -= rng.To - rng.From
 	}
-	nodmux.Unlock()
+	s.nodmux.Unlock()
+}
+
+// FindByName returns ID of first founded file record with given name, or 0 if it is not found.
+func (s *Storage) FindIdByName(name string) (fid int64) {
+	s.FIMap.Range(func(key interface{}, value interface{}) bool {
+		var fi = value.(*FileInfo)
+		if fi.Name == name {
+			fid = fi.FileID
+			return false
+		}
+		return true
+	})
+	return
+}
+
+// FindFileInfo searches file record by given `fid`, or by `name` if `fid` is zero.
+// Returns founded record, or nil if it not found.
+func (s *Storage) FindFileInfo(fid int64, name string) (info *FileInfo) {
+	if fid == 0 {
+		fid = s.FindIdByName(name)
+	}
+	if data, ok := s.FIMap.Load(fid); ok {
+		info = data.(*FileInfo)
+	}
+	return
+}
+
+var (
+	ErrNRBadWhence = errors.New("NodesReader.Seek: invalid whence")
+	ErrNRPosNeg    = errors.New("NodesReader.Seek: negative position")
+	ErrNROffNeg    = errors.New("NodesReader.ReadAt: negative offset")
+)
+
+type NodesReader struct {
+	storage *Storage
+	info    *FileInfo
+	pos     int64 // current reading index
+}
+
+// Size returns the original length of the file.
+// Size is the number of bytes available for reading via ReadAt.
+// The returned value is always the same and is not affected by calls
+// to any other method.
+func (r *NodesReader) Size() int64 {
+	return r.info.Size
+}
+
+// Seek implements the io.Seeker interface.
+func (r *NodesReader) Seek(offset int64, whence int) (int64, error) {
+	var abs int64
+	switch whence {
+	case io.SeekStart:
+		abs = offset
+	case io.SeekCurrent:
+		abs = r.pos + offset
+	case io.SeekEnd:
+		abs = r.info.Size + offset
+	default:
+		return 0, ErrNRBadWhence
+	}
+	if abs < 0 {
+		return 0, ErrNRPosNeg
+	}
+	if abs > r.info.Size {
+		return 0, io.EOF
+	}
+	r.pos = abs
+	return abs, nil
+}
+
+// readRange reads chunk of file with given range, from `off` position to `end` position.
+// Length of this range must not be larger than `b` length.
+func (r *NodesReader) readRange(off, end int64, b []byte) (n int, err error) {
+	for _, rng := range r.info.Chunks {
+		if rng.From < end && rng.To > off {
+			var from = off
+			if rng.From > off {
+				from = rng.From
+			}
+			var to = end
+			if rng.To < end {
+				to = rng.To
+			}
+			var ctx = context.Background() // no any limits
+			var in = &pb.Range{
+				NodeId: rng.NodeId,
+				FileId: rng.FileId,
+				From:   from,
+				To:     to,
+			}
+			var chunk *pb.Chunk
+			r.storage.nodmux.RLock()
+			var node = r.storage.Nodes[rng.NodeId]
+			r.storage.nodmux.RUnlock()
+			if chunk, err = node.Client.Read(ctx, in); err != nil {
+				return
+			}
+			n += copy(b[chunk.Range.From-off:], chunk.Value)
+		}
+	}
+	r.pos = end
+	return
+}
+
+// Read implements the io.Reader interface.
+func (r *NodesReader) Read(b []byte) (n int, err error) {
+	if r.pos >= r.info.Size {
+		return 0, io.EOF
+	}
+
+	var off = r.pos
+	var end = off + int64(len(b))
+	if end > r.info.Size {
+		end = r.info.Size
+	}
+	return r.readRange(off, end, b)
+}
+
+// ReadAt implements the io.ReaderAt interface.
+func (r *NodesReader) ReadAt(b []byte, off int64) (n int, err error) {
+	// cannot modify state - see io.ReaderAt
+	if off < 0 {
+		return 0, ErrNROffNeg
+	}
+	if off >= r.info.Size {
+		return 0, io.EOF
+	}
+
+	var end = off + int64(len(b))
+	if end > r.info.Size {
+		end = r.info.Size
+	}
+	if n, err = r.readRange(off, end, b); err != nil {
+		return
+	}
+	if n < len(b) {
+		err = io.EOF
+	}
+	return
 }

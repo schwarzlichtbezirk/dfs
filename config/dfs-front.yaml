@@ -23,8 +23,5 @@ webserver: # See https://golang.org/pkg/net/http/#Server for details.
 storage:
     # Minimum size of chunk to divide the file and put to nodes, except last chunk.
     min-node-chunk-size: 4096 # 4K
-    # If it 'true', chunks size makes to bring nodes sum data size to equal values.
-    # Otherwise chunks sizes perhaps to equal.
-    node-fluid-chunks: false
     # Maximum chunk size to send to each node during the streaming.
-    stream-chunk-size: 512
+    stream-chunk-size: 1024

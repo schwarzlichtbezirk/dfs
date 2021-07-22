@@ -8,9 +8,6 @@ import (
 	"os/signal"
 	"sync"
 	"syscall"
-
-	"github.com/schwarzlichtbezirk/dfs/pb"
-	"google.golang.org/grpc"
 )
 
 var (
@@ -18,6 +15,8 @@ var (
 	exitchan = make(chan struct{})
 	// wait group for all server goroutines
 	exitwg sync.WaitGroup
+	// wait group for grpc goroutines
+	grpcwg sync.WaitGroup
 )
 
 // Run launches server listeners.
@@ -41,59 +40,16 @@ func Run(gmux *Router) {
 		log.Fatal(err)
 	}
 	log.Printf("total %d nodes\n", len(nodes))
-	Nodes = make([]NodeInfo, len(nodes))
+	storage.Nodes = make([]*NodeInfo, len(nodes))
 
 	// starts gRPC clients
-	var grpcwg sync.WaitGroup
 	for i, addr := range nodes {
-		var i = i
-		var addr = addr
-
-		exitwg.Add(1)
-		grpcwg.Add(1)
-		go func() {
-			defer exitwg.Done()
-
-			var conn *grpc.ClientConn
-			var ok bool
-
-			func() {
-				defer grpcwg.Done()
-
-				var err error
-				log.Printf("grpc connection wait on %s\n", addr)
-				var ctx, cancel = context.WithCancel(context.Background())
-				go func() {
-					defer cancel()
-					if conn, err = grpc.DialContext(ctx, addr, grpc.WithInsecure(), grpc.WithBlock()); err != nil {
-						log.Fatalf("fail to dial on %s: %v", addr, err)
-					}
-					Nodes[i].Client = pb.NewDataGuideClient(conn)
-					Nodes[i].Addr = addr
-					Nodes[i].SumSize = 0
-				}()
-				// wait until connect will be established or have got exit signal
-				select {
-				case <-ctx.Done():
-					log.Printf("grpc connection established on %s\n", addr)
-					ok = true
-				case <-exitchan:
-					log.Printf("grpc connection canceled on %s\n", addr)
-				}
-			}()
-
-			if ok {
-				defer conn.Close()
-				// wait for exit signal
-				<-exitchan
-
-				if err := conn.Close(); err != nil {
-					log.Printf("grpc disconnect on %s: %v\n", addr, err)
-				} else {
-					log.Printf("grpc disconnected on %s\n", addr)
-				}
-			}
-		}()
+		var node = &NodeInfo{
+			Addr:    addr,
+			SumSize: 0,
+		}
+		storage.Nodes[i] = node
+		node.RunGRPC()
 	}
 	// wait until all grpc starts
 	grpcwg.Wait()

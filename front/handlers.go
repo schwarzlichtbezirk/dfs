@@ -6,7 +6,7 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"sync/atomic"
+	"strconv"
 	"time"
 
 	"github.com/schwarzlichtbezirk/dfs/pb"
@@ -30,18 +30,31 @@ const (
 	AECuploadsend2
 	AECuploadreply
 
+	// download
+	AECdownloadbadid
+	AECdownloadnoarg
+	AECdownloadabsent
+
 	// fileinfo
 	AECfileinfonoarg
 
 	// remove
 	AECremovenoarg
 	AECremovegrpc
+
+	// addnode
+	AECaddnodenodata
+	AECaddnodehas
 )
 
 // HTTP error messages
 var (
-	ErrNoJSON = errors.New("data not given")
-	ErrNoData = errors.New("data is empty")
+	ErrNoJSON   = errors.New("data not given")
+	ErrNoData   = errors.New("data is empty")
+	ErrNotFound = errors.New("404 file not found")
+
+	ErrArgBadID = errors.New("file ID can not be parsed as an integer")
+	ErrNodeHas  = errors.New("node with given addres already present")
 )
 
 // pingAPI is ping helper to check transactions latency and webserver health.
@@ -54,12 +67,12 @@ func pingAPI(w http.ResponseWriter, r *http.Request) {
 
 // nodesizeAPI returns array with sum size of all chunks on each nodes.
 func nodesizeAPI(w http.ResponseWriter, r *http.Request) {
-	nodmux.RLock()
-	var ret = make([]int64, len(Nodes))
-	for i, node := range Nodes {
+	storage.nodmux.RLock()
+	var ret = make([]int64, len(storage.Nodes))
+	for i, node := range storage.Nodes {
 		ret[i] = node.SumSize
 	}
-	nodmux.RUnlock()
+	storage.nodmux.RUnlock()
 
 	WriteOK(w, ret)
 }
@@ -74,25 +87,13 @@ func uploadAPI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer file.Close()
-	var mime = "N/A"
-	if ct, ok := handler.Header["Content-Type"]; ok && len(ct) > 0 {
-		mime = ct[0]
-	}
-	log.Printf("upload file: %s, size: %d, mime: %s\n", handler.Filename, handler.Size, mime)
 
-	// make file ID
-	var fid = atomic.AddInt64(&idconter, 1)
-	// declare file info
-	var info = &FileInfo{
-		FileID: fid,
-		Name:   handler.Filename,
-		Size:   handler.Size,
-		MIME:   mime,
-	}
+	var info = storage.MakeFileInfo(handler)
+	log.Printf("upload file: %s, size: %d, mime: %s\n", handler.Filename, handler.Size, info.MIME)
 
-	nodmux.RLock()
-	var nn = int64(len(Nodes)) // nodes number
-	nodmux.RUnlock()
+	storage.nodmux.RLock()
+	var nn = int64(len(storage.Nodes)) // nodes number
+	storage.nodmux.RUnlock()
 	var cn int64 // chunks number
 	var cr int64 // chunks remainder
 	if cfg.MinNodeChunkSize == 0 {
@@ -110,7 +111,7 @@ func uploadAPI(w http.ResponseWriter, r *http.Request) {
 		for i := int64(0); i < nn; i++ {
 			info.Chunks[i] = &pb.Range{
 				NodeId: i,
-				FileId: fid,
+				FileId: info.FileID,
 				From:   cs * i,
 				To:     cs * (i + 1),
 			}
@@ -123,7 +124,7 @@ func uploadAPI(w http.ResponseWriter, r *http.Request) {
 		for i := int64(0); i < cn; i++ {
 			info.Chunks[i] = &pb.Range{
 				NodeId: i,
-				FileId: fid,
+				FileId: info.FileID,
 				From:   cfg.MinNodeChunkSize * i,
 				To:     cfg.MinNodeChunkSize * (i + 1),
 			}
@@ -153,7 +154,10 @@ func uploadAPI(w http.ResponseWriter, r *http.Request) {
 		var err error
 		var ctx = context.Background() // no any limits
 		var stream pb.DataGuide_WriteClient
-		if stream, err = Nodes[rng.NodeId].Client.Write(ctx); err != nil {
+		storage.nodmux.RLock()
+		var node = storage.Nodes[rng.NodeId]
+		storage.nodmux.RUnlock()
+		if stream, err = node.Client.Write(ctx); err != nil {
 			errs[i] = &ErrAjax{err, AECuploadwrite}
 			return
 		}
@@ -231,9 +235,41 @@ func uploadAPI(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// save file information at last to get ready for full access after it
-	info.NodesAdd()
+	storage.AddFileInfo(info)
 
 	WriteOK(w, info)
+}
+
+func downloadAPI(w http.ResponseWriter, r *http.Request) {
+	var err error
+
+	// get arguments
+	var fid int64
+	if s := r.FormValue("id"); len(s) > 0 {
+		if fid, err = strconv.ParseInt(s, 10, 64); err != nil {
+			WriteError400(w, ErrArgBadID, AECdownloadbadid)
+			return
+		}
+	}
+	var name string
+	if s := r.FormValue("name"); len(s) > 0 {
+		name = s
+	}
+
+	if fid == 0 && name == "" {
+		WriteError400(w, ErrNoData, AECdownloadnoarg)
+		return
+	}
+
+	var info = storage.FindFileInfo(fid, name)
+
+	if info == nil {
+		WriteError(w, http.StatusNotFound, ErrNotFound, AECdownloadabsent)
+		return
+	}
+
+	w.Header().Set("Content-Type", info.MIME)
+	http.ServeContent(w, r, info.Name, time.Time{}, storage.NewReader(info))
 }
 
 func fileinfoAPI(w http.ResponseWriter, r *http.Request) {
@@ -253,20 +289,7 @@ func fileinfoAPI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if arg.ID > 0 {
-		if data, ok := storage.Load(arg.ID); ok {
-			ret = data.(*FileInfo)
-		}
-	} else {
-		storage.Range(func(key interface{}, value interface{}) bool {
-			var fi = value.(*FileInfo)
-			if fi.Name == arg.Name {
-				ret = fi
-				return false
-			}
-			return true
-		})
-	}
+	ret = storage.FindFileInfo(arg.ID, arg.Name)
 
 	WriteOK(w, ret)
 }
@@ -288,32 +311,68 @@ func removeAPI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if arg.ID > 0 {
-		if data, ok := storage.Load(arg.ID); ok {
-			ret = data.(*FileInfo)
-		}
-	} else {
-		storage.Range(func(key interface{}, value interface{}) bool {
-			var fi = value.(*FileInfo)
-			if fi.Name == arg.Name {
-				ret = fi
-				return false
-			}
-			return true
-		})
-	}
+	ret = storage.FindFileInfo(arg.ID, arg.Name)
 
 	if ret != nil {
-		ret.NodesDel() // file data can not be accessed after it
+		storage.DelFileInfo(ret) // file data can not be accessed after it
 		for _, rng := range ret.Chunks {
 			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 			defer cancel()
-			if _, err = Nodes[rng.NodeId].Client.Remove(ctx, &pb.FileID{Id: rng.FileId}); err != nil {
+			storage.nodmux.RLock()
+			var node = storage.Nodes[rng.NodeId]
+			storage.nodmux.RUnlock()
+			if _, err = node.Client.Remove(ctx, &pb.FileID{Id: rng.FileId}); err != nil {
 				WriteError500(w, err, AECremovegrpc)
 				return
 			}
 		}
 	}
+
+	WriteOK(w, ret)
+}
+
+func addnodeAPI(w http.ResponseWriter, r *http.Request) {
+	var err error
+	var arg struct {
+		Addr string `json:"addr"`
+	}
+	var ret int // index of added node
+
+	// get arguments
+	if err = AjaxGetArg(w, r, &arg); err != nil {
+		return
+	}
+	if arg.Addr == "" {
+		WriteError400(w, ErrNoData, AECaddnodenodata)
+		return
+	}
+
+	var found bool
+	storage.nodmux.RLock()
+	for _, node := range storage.Nodes {
+		if node.Addr == arg.Addr {
+			found = true
+			break
+		}
+	}
+	storage.nodmux.RUnlock()
+	if found {
+		WriteError400(w, ErrNodeHas, AECaddnodehas)
+		return
+	}
+
+	var node = &NodeInfo{
+		Addr:    arg.Addr,
+		SumSize: 0,
+	}
+
+	storage.nodmux.Lock()
+	ret = len(storage.Nodes) // get size, it will be index
+	storage.Nodes = append(storage.Nodes, node)
+	storage.nodmux.Unlock()
+
+	node.RunGRPC()
+	grpcwg.Wait()
 
 	WriteOK(w, ret)
 }

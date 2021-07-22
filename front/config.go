@@ -25,7 +25,6 @@ type CfgWebServ struct {
 
 type CfgStorage struct {
 	MinNodeChunkSize int64 `json:"min-node-chunk-size" yaml:"min-node-chunk-size"`
-	NodeFluidChunks  bool  `json:"node-fluid-chunks" yaml:"node-fluid-chunks"`
 	StreamChunkSize  int64 `json:"stream-chunk-size" yaml:"stream-chunk-size"`
 }
 
@@ -48,8 +47,7 @@ var cfg = Config{ // inits default values:
 	},
 	CfgStorage: CfgStorage{
 		MinNodeChunkSize: 4 * 1024,
-		NodeFluidChunks:  false,
-		StreamChunkSize:  512,
+		StreamChunkSize:  1024,
 	},
 }
 
