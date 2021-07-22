@@ -8,7 +8,6 @@ import (
 	"os/signal"
 	"sync"
 	"syscall"
-	"time"
 
 	"github.com/schwarzlichtbezirk/dfs/pb"
 	"google.golang.org/grpc"
@@ -19,10 +18,6 @@ var (
 	exitchan = make(chan struct{})
 	// wait group for all server goroutines
 	exitwg sync.WaitGroup
-)
-
-var (
-	grpcClient []pb.DataGuideClient
 )
 
 // Run launches server listeners.
@@ -41,11 +36,12 @@ func Run(gmux *Router) {
 	}
 	log.Printf("loaded '%s'\n", cfgfile)
 
+	var nodes []string
 	if err = ReadYaml(nodesfile, &nodes); err != nil {
 		log.Fatal(err)
 	}
 	log.Printf("total %d nodes\n", len(nodes))
-	grpcClient = make([]pb.DataGuideClient, len(nodes))
+	Nodes = make([]NodeInfo, len(nodes))
 
 	// starts gRPC clients
 	var grpcwg sync.WaitGroup
@@ -58,36 +54,40 @@ func Run(gmux *Router) {
 		go func() {
 			defer exitwg.Done()
 
-			var err error
 			var conn *grpc.ClientConn
 			var ok bool
 
 			func() {
 				defer grpcwg.Done()
 
-				log.Printf("grpc connecting on %s\n", addr)
+				var err error
+				log.Printf("grpc connection wait on %s\n", addr)
 				var ctx, cancel = context.WithCancel(context.Background())
-				defer cancel()
-
-				if conn, err = grpc.DialContext(ctx, addr, grpc.WithInsecure()); err != nil {
-					log.Fatalf("fail to dial on %s: %v", addr, err)
-				}
+				go func() {
+					defer cancel()
+					if conn, err = grpc.DialContext(ctx, addr, grpc.WithInsecure(), grpc.WithBlock()); err != nil {
+						log.Fatalf("fail to dial on %s: %v", addr, err)
+					}
+					Nodes[i].Client = pb.NewDataGuideClient(conn)
+					Nodes[i].Addr = addr
+					Nodes[i].SumSize = 0
+				}()
 				// wait until connect will be established or have got exit signal
 				select {
 				case <-ctx.Done():
-					grpcClient[i] = pb.NewDataGuideClient(conn)
-					log.Printf("grpc connected on %s\n", addr)
+					log.Printf("grpc connection established on %s\n", addr)
 					ok = true
 				case <-exitchan:
-					log.Printf("grpc canceled for %s\n", addr)
+					log.Printf("grpc connection canceled on %s\n", addr)
 				}
 			}()
 
 			if ok {
+				defer conn.Close()
 				// wait for exit signal
 				<-exitchan
 
-				if err = conn.Close(); err != nil {
+				if err := conn.Close(); err != nil {
 					log.Printf("grpc disconnect on %s: %v\n", addr, err)
 				} else {
 					log.Printf("grpc disconnected on %s\n", addr)
@@ -115,10 +115,10 @@ func Run(gmux *Router) {
 			var server = &http.Server{
 				Addr:              addr,
 				Handler:           gmux,
-				ReadTimeout:       time.Duration(cfg.ReadTimeout) * time.Second,
-				ReadHeaderTimeout: time.Duration(cfg.ReadHeaderTimeout) * time.Second,
-				WriteTimeout:      time.Duration(cfg.WriteTimeout) * time.Second,
-				IdleTimeout:       time.Duration(cfg.IdleTimeout) * time.Second,
+				ReadTimeout:       cfg.ReadTimeout,
+				ReadHeaderTimeout: cfg.ReadHeaderTimeout,
+				WriteTimeout:      cfg.WriteTimeout,
+				IdleTimeout:       cfg.IdleTimeout,
 				MaxHeaderBytes:    cfg.MaxHeaderBytes,
 			}
 			go func() {
@@ -134,7 +134,7 @@ func Run(gmux *Router) {
 			// create a deadline to wait for.
 			var ctx, cancel = context.WithTimeout(
 				context.Background(),
-				time.Duration(cfg.ShutdownTimeout)*time.Second)
+				cfg.ShutdownTimeout)
 			defer cancel()
 
 			server.SetKeepAlivesEnabled(false)

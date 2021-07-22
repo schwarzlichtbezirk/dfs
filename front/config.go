@@ -11,8 +11,8 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// CfgServ is web server settings.
-type CfgServ struct {
+// CfgWebServ is web server settings.
+type CfgWebServ struct {
 	PortHTTP          []string      `json:"port-http" yaml:"port-http"`
 	ReadTimeout       time.Duration `json:"read-timeout" yaml:"read-timeout"`
 	ReadHeaderTimeout time.Duration `json:"read-header-timeout" yaml:"read-header-timeout"`
@@ -23,18 +23,21 @@ type CfgServ struct {
 	ShutdownTimeout time.Duration `json:"shutdown-timeout" yaml:"shutdown-timeout"`
 }
 
-type CfgNode struct {
-	AddrGRPC string `json:"addr-grpc" yaml:"addr-grpc"`
+type CfgStorage struct {
+	MinNodeChunkSize int64 `json:"min-node-chunk-size" yaml:"min-node-chunk-size"`
+	NodeFluidChunks  bool  `json:"node-fluid-chunks" yaml:"node-fluid-chunks"`
+	StreamChunkSize  int64 `json:"stream-chunk-size" yaml:"stream-chunk-size"`
 }
 
 // Config is common service settings.
 type Config struct {
-	CfgServ `json:"webserver" yaml:"webserver"`
+	CfgWebServ `json:"webserver" yaml:"webserver"`
+	CfgStorage `json:"storage" yaml:"storage"`
 }
 
 // cfg is instance of common service settings.
 var cfg = Config{ // inits default values:
-	CfgServ: CfgServ{
+	CfgWebServ: CfgWebServ{
 		PortHTTP:          []string{":8010"},
 		ReadTimeout:       time.Duration(15) * time.Second,
 		ReadHeaderTimeout: time.Duration(15) * time.Second,
@@ -43,10 +46,11 @@ var cfg = Config{ // inits default values:
 		MaxHeaderBytes:    1 << 20,
 		ShutdownTimeout:   time.Duration(15) * time.Second,
 	},
-}
-
-var nodes = []string{
-	"localhost:50050",
+	CfgStorage: CfgStorage{
+		MinNodeChunkSize: 4 * 1024,
+		NodeFluidChunks:  false,
+		StreamChunkSize:  512,
+	},
 }
 
 const (
@@ -57,6 +61,7 @@ const (
 // ConfigPath determines configuration path, depended on what directory is exist.
 var ConfigPath string
 
+// ErrNoCongig is "no configuration path was found" error message.
 var ErrNoCongig = errors.New("no configuration path was found")
 
 // DetectConfigPath finds configuration path.

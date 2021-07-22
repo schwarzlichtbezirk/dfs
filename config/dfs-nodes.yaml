@@ -1,3 +1,4 @@
 # distributed file server list of nodes.
 
-- localhost:50050
+- localhost:50051
+- localhost:50052
