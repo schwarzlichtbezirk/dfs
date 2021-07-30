@@ -21,6 +21,8 @@ webserver: # See https://golang.org/pkg/net/http/#Server for details.
     # Maximum duration to wait for graceful shutdown.
     shutdown-timeout: 15s
 storage:
+    # Points to fill nodes by fluid algorithm.
+    node-fluid-fill: true
     # Minimum size of chunk to divide the file and put to nodes, except last chunk.
     min-node-chunk-size: 4096 # 4K
     # Maximum chunk size to send to each node during the streaming.

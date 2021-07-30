@@ -86,3 +86,9 @@ func (s *routeDataGuideServer) Remove(ctx context.Context, arg *pb.FileID) (res 
 	res = &pb.Range{}
 	return
 }
+
+func (s *routeDataGuideServer) Purge(ctx context.Context, arg *pb.Empty) (res *pb.Empty, err error) {
+	storage = sync.Map{}
+	res = &pb.Empty{}
+	return
+}

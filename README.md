@@ -29,11 +29,12 @@ Folder `github.com\schwarzlichtbezirk\dfs\tool` contains batch helpers to compil
 
 5. Run services.
 ```batch
-%GOPATH%/bin/dfs.front.x64.exe
-%GOPATH%/bin/dfs.node.x64.exe -p 50051
-%GOPATH%/bin/dfs.node.x64.exe -p 50052
+start "front" %GOPATH%/bin/dfs.front.x64.exe
+start "node#1" %GOPATH%/bin/dfs.node.x64.exe -p :50051
+start "node#2" %GOPATH%/bin/dfs.node.x64.exe -p :50052
 rem and other nodes instances
 ```
+or run `github.com\schwarzlichtbezirk\dfs\tool\start.x64.cmd` batch-file to start composition for default nodes list.
 
 ### What its need else to modify code
 
@@ -98,11 +99,11 @@ Returns array of chunks properties for file with given `id` or given `name`. Sin
 ### Remove file from storage
 
 ```batch
-curl -X GET localhost:8008/api/v0/remove -d "{\"id\":1}"
+curl -X POST localhost:8008/api/v0/remove -d "{\"id\":1}"
 ```
 or
 ```batch
-curl -X GET localhost:8008/api/v0/remove -d "{\"name\":\"IMG_20200519_145112.jpg\"}"
+curl -X POST localhost:8008/api/v0/remove -d "{\"name\":\"IMG_20200519_145112.jpg\"}"
 ```
 Deletes all chunks on nodes and information about file with given `id` or given `name`. Returns array of chunks properties of deleted file. Returns `null` if file was not found.
 
@@ -116,39 +117,65 @@ Adds new node during service is running. Transaction waits util gRPC connection 
 
 ## Simple sample to test the service
 
-1. Upload some 2 images:
+1. Upload some first images:
 ```batch
 curl -i -X POST -H "Content-Type: multipart/form-data" -F "datafile=@H:\src\IMG_20200519_145112.jpg" localhost:8010/api/v0/upload
+```
+
+2. Check up data volumes used by nodes:
+```batch
+curl -X GET localhost:8010/api/v0/nodesize
+```
+
+3. Start new node instance and add it to composition in runtime:
+```batch
+start "node#new" dfs.node.x64.exe -p :50080
+curl -X POST localhost:8008/api/v0/addnode -d "{\"addr\":\":50080\"}"
+```
+
+4. Upload some second image. Percent for new node will be larger:
+```batch
 curl -i -X POST -H "Content-Type: multipart/form-data" -F "datafile=@H:\src\IMG_20200519_145207.jpg" localhost:8010/api/v0/upload
 ```
-2. View those images in browser by followed links:
+
+5. Check up data volumes used by nodes again:
+```batch
+curl -X GET localhost:8010/api/v0/nodesize
+```
+
+6. View those images in browser by followed links:
 
 [IMG_20200519_145112.jpg](http://localhost:8010/api/v0/download?id=1) and
 [IMG_20200519_145207.jpg](http://localhost:8010/api/v0/download?id=2)
 
-3. Check up data volumes used by nodes:
+7. Remove 1st image from storage:
+```batch
+curl -X POST localhost:8010/api/v0/remove -d "{\"id\":1}"
+```
+
+8. Check up data volumes again after it:
 ```batch
 curl -X GET localhost:8010/api/v0/nodesize
 ```
 
-4. Remove 1st image from storage:
-```batch
-curl -X GET localhost:8010/api/v0/remove -d "{\"id\":1}"
-```
-
-5. Check up data volumes again after it:
-```batch
-curl -X GET localhost:8010/api/v0/nodesize
-```
-
-6. Try to get file info for removed file:
+9. Try to get file info for removed file:
 ```batch
 curl -X GET localhost:8010/api/v0/fileinfo -d "{\"id\":1}"
 ```
 
-7. View file info for second image remaining in storage:
+10. View file info for second image remaining in storage:
 ```batch
 curl -X GET localhost:8010/api/v0/fileinfo -d "{\"id\":2}"
+```
+
+11. Clear data storage:
+```batch
+curl -X PUT localhost:8010/api/v0/clear
+```
+
+12. Check up data volumes is zero:
+```batch
+curl -X GET localhost:8010/api/v0/nodesize
 ```
 
 ---

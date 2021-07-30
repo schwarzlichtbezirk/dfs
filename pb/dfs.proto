@@ -14,6 +14,12 @@ service DataGuide {
 	rpc GetRange(FileID) returns (Range) {}
 	// Remove deletes file chunks.
 	rpc Remove(FileID) returns (Range) {}
+	// Purge deleted all file chunks.
+	rpc Purge(Empty) returns (Empty) {}
+}
+
+// Empty is empty message when no needs for any data.
+message Empty {
 }
 
 // FileID is ID of file.

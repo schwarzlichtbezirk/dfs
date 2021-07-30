@@ -158,5 +158,6 @@ func RegisterRoutes(gmux *Router) {
 	api.Path("/download").HandlerFunc(downloadAPI)
 	api.Path("/fileinfo").HandlerFunc(fileinfoAPI)
 	api.Path("/remove").HandlerFunc(removeAPI)
+	api.Path("/clear").HandlerFunc(clearAPI)
 	api.Path("/addnode").HandlerFunc(addnodeAPI)
 }

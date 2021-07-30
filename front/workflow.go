@@ -33,6 +33,12 @@ func Run(gmux *Router) {
 	if err = ReadYaml(cfgfile, &cfg); err != nil {
 		log.Fatalf("can not read '%s' file: %v\n", cfgfile, err)
 	}
+	if cfg.MinNodeChunkSize <= 0 {
+		cfg.MinNodeChunkSize = 4 * 1024
+	}
+	if cfg.StreamChunkSize <= 0 {
+		cfg.StreamChunkSize = 512
+	}
 	log.Printf("loaded '%s'\n", cfgfile)
 
 	var nodes []string

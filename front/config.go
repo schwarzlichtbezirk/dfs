@@ -24,6 +24,7 @@ type CfgWebServ struct {
 }
 
 type CfgStorage struct {
+	NodeFluidFill    bool  `json:"node-fluid-fill" yaml:"node-fluid-fill"`
 	MinNodeChunkSize int64 `json:"min-node-chunk-size" yaml:"min-node-chunk-size"`
 	StreamChunkSize  int64 `json:"stream-chunk-size" yaml:"stream-chunk-size"`
 }
@@ -46,6 +47,7 @@ var cfg = Config{ // inits default values:
 		ShutdownTimeout:   time.Duration(15) * time.Second,
 	},
 	CfgStorage: CfgStorage{
+		NodeFluidFill:    true,
 		MinNodeChunkSize: 4 * 1024,
 		StreamChunkSize:  1024,
 	},

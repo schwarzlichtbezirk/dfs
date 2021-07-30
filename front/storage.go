@@ -144,6 +144,25 @@ func (s *Storage) DelFileInfo(fi *FileInfo) {
 	s.nodmux.Unlock()
 }
 
+// Clear performs safe and quick delete of all stored data.
+func (s *Storage) Clear() {
+	// below assignment to absolute values, so lock performs to whole content
+	s.nodmux.Lock()
+	defer s.nodmux.Unlock()
+
+	// reset files info map
+	s.FIMap = sync.Map{}
+
+	// update statistics
+	for _, node := range s.Nodes {
+		node.NumChunks = 0
+		node.SumSize = 0
+	}
+
+	// no needs for atomic on locked content
+	s.idconter = 0
+}
+
 // FindByName returns ID of first founded file record with given name, or 0 if it is not found.
 func (s *Storage) FindIdByName(name string) (fid int64) {
 	s.FIMap.Range(func(key interface{}, value interface{}) bool {

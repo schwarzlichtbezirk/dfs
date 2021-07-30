@@ -31,6 +31,8 @@ type DataGuideClient interface {
 	GetRange(ctx context.Context, in *FileID, opts ...grpc.CallOption) (*Range, error)
 	// Remove deletes file chunks.
 	Remove(ctx context.Context, in *FileID, opts ...grpc.CallOption) (*Range, error)
+	// Purge deleted all file chunks.
+	Purge(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error)
 }
 
 type dataGuideClient struct {
@@ -102,6 +104,15 @@ func (c *dataGuideClient) Remove(ctx context.Context, in *FileID, opts ...grpc.C
 	return out, nil
 }
 
+func (c *dataGuideClient) Purge(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error) {
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, "/dfs.DataGuide/Purge", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // DataGuideServer is the server API for DataGuide service.
 // All implementations must embed UnimplementedDataGuideServer
 // for forward compatibility
@@ -115,6 +126,8 @@ type DataGuideServer interface {
 	GetRange(context.Context, *FileID) (*Range, error)
 	// Remove deletes file chunks.
 	Remove(context.Context, *FileID) (*Range, error)
+	// Purge deleted all file chunks.
+	Purge(context.Context, *Empty) (*Empty, error)
 	mustEmbedUnimplementedDataGuideServer()
 }
 
@@ -133,6 +146,9 @@ func (UnimplementedDataGuideServer) GetRange(context.Context, *FileID) (*Range, 
 }
 func (UnimplementedDataGuideServer) Remove(context.Context, *FileID) (*Range, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Remove not implemented")
+}
+func (UnimplementedDataGuideServer) Purge(context.Context, *Empty) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Purge not implemented")
 }
 func (UnimplementedDataGuideServer) mustEmbedUnimplementedDataGuideServer() {}
 
@@ -227,6 +243,24 @@ func _DataGuide_Remove_Handler(srv interface{}, ctx context.Context, dec func(in
 	return interceptor(ctx, in, info, handler)
 }
 
+func _DataGuide_Purge_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DataGuideServer).Purge(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/dfs.DataGuide/Purge",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DataGuideServer).Purge(ctx, req.(*Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // DataGuide_ServiceDesc is the grpc.ServiceDesc for DataGuide service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -245,6 +279,10 @@ var DataGuide_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Remove",
 			Handler:    _DataGuide_Remove_Handler,
+		},
+		{
+			MethodName: "Purge",
+			Handler:    _DataGuide_Purge_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{
