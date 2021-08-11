@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"sync"
 	"syscall"
 )
@@ -41,11 +42,14 @@ func Run(gmux *Router) {
 	}
 	log.Printf("loaded '%s'\n", cfgfile)
 
+	// gets expected nodes list.
 	var nodes []string
-	if err = ReadYaml(nodesfile, &nodes); err != nil {
+	if s := os.Getenv("DFSNODES"); s != "" {
+		nodes = strings.Split(s, ";")
+	} else if err = ReadYaml(nodesfile, &nodes); err != nil {
 		log.Fatal(err)
 	}
-	log.Printf("total %d nodes\n", len(nodes))
+	log.Printf("expects %d nodes\n", len(nodes))
 	storage.Nodes = make([]*NodeInfo, len(nodes))
 
 	// starts gRPC clients

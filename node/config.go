@@ -27,7 +27,7 @@ var ErrNoPorts = errors.New("no ports were given to node")
 // DetectPort explores incoming data sources for port that will be used for gRPC.
 func DetectPort() (err error) {
 	if envport := os.Getenv("DFSNODEPORT"); len(envport) > 0 {
-		cfg.PortGRPC = envport
+		cfg.PortGRPC = ":" + envport
 		return
 	}
 

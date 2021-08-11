@@ -1,0 +1,77 @@
+# Build images by followed commands and run compose:
+#    docker build --pull --rm -f "Dockerfile.node" -t dfs-node:latest "."
+#    docker build --pull --rm -f "Dockerfile.front" -t dfs-front:latest "."
+#    docker-compose -f "docker-compose.yaml" up -d --build
+
+version: "3.9"
+
+services:
+
+  front-svc:
+    image: dfs-front
+    #build:
+      #context: .
+      #dockerfile: Dockerfile.front
+    depends_on:
+      - node-svc1
+      - node-svc2
+    ports:
+      - 8008:8008
+      - 8010:8010
+    networks:
+      dfsnet:
+        ipv4_address: 172.20.1.100
+        aliases:
+          - front
+    environment:
+      DFSNODES: node1:50051;node2:50052
+    restart: on-failure
+    stop_signal: SIGINT
+    stop_grace_period: 15s
+
+  node-svc1:
+    image: dfs-node
+    #build:
+      #context: .
+      #dockerfile: Dockerfile.node
+    #ports:
+      #- "50051:50051"
+    networks:
+      dfsnet:
+        ipv4_address: 172.20.1.1
+        aliases:
+          - node1
+    environment:
+      DFSNODEPORT: "50051"
+    restart: on-failure
+    stop_signal: SIGINT
+    stop_grace_period: 15s
+
+  node-svc2:
+    image: dfs-node
+    #build:
+      #context: .
+      #dockerfile: Dockerfile.node
+    #ports:
+      #- "50052:50051"
+    networks:
+      dfsnet:
+        ipv4_address: 172.20.1.2
+        aliases:
+          - node2
+    environment:
+      DFSNODEPORT: "50052"
+    restart: on-failure
+    stop_signal: SIGINT
+    stop_grace_period: 15s
+
+networks:
+  dfsnet:
+    name: dfsnet
+    external: false
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.20.0.0/16
+          ip_range: 172.20.1.0/24
+          gateway: 172.20.1.254

@@ -36,6 +36,24 @@ rem and other nodes instances
 ```
 or run `github.com\schwarzlichtbezirk\dfs\tool\start.x64.cmd` batch-file to start composition for default nodes list.
 
+### How to run in docker
+
+1. Change current directory to project root.
+```batch
+cd /d %GOPATH%/src/github.com/schwarzlichtbezirk/dfs
+```
+
+2. Build docker images for `front` and for `node` services.
+```batch
+docker build --pull --rm -f "Dockerfile.node" -t dfs-node:latest "."
+docker build --pull --rm -f "Dockerfile.front" -t dfs-front:latest "."
+```
+
+3. Then run docker compose file.
+```batch
+docker-compose -f "docker-compose.yaml" up -d --build
+```
+
 ### What its need else to modify code
 
 If you want to modify `.go`-code and `.proto` file, you should [download](https://github.com/protocolbuffers/protobuf/blob/master/README.md#protocol-compiler-installation) and install protocol buffer compiler. Then fetch and compile protocol buffer compiler plugins:

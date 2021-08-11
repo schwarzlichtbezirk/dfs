@@ -68,7 +68,7 @@ var ErrNoCongig = errors.New("no configuration path was found")
 func DetectConfigPath() (err error) {
 	var path string
 	// try to get from environment setting
-	if path = os.Getenv("APPCONFIGPATH"); path != "" {
+	if path = os.Getenv("DFSCONFIGPATH"); path != "" {
 		if ok, _ := pathexists(path); ok {
 			ConfigPath = path
 			return
