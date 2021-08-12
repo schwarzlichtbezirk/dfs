@@ -1,4 +1,4 @@
-# Build images by followed commands and run compose:
+# Build images by followed commands and run composition:
 #    docker build --pull --rm -f "Dockerfile.node" -t dfs-node:latest "."
 #    docker build --pull --rm -f "Dockerfile.front" -t dfs-front:latest "."
 #    docker-compose -f "docker-compose.yaml" up -d --build
@@ -19,7 +19,7 @@ services:
       - 8008:8008
       - 8010:8010
     networks:
-      dfsnet:
+      dfs-net:
         ipv4_address: 172.20.1.100
         aliases:
           - front
@@ -37,7 +37,7 @@ services:
     #ports:
       #- "50051:50051"
     networks:
-      dfsnet:
+      dfs-net:
         ipv4_address: 172.20.1.1
         aliases:
           - node1
@@ -55,7 +55,7 @@ services:
     #ports:
       #- "50052:50051"
     networks:
-      dfsnet:
+      dfs-net:
         ipv4_address: 172.20.1.2
         aliases:
           - node2
@@ -66,8 +66,8 @@ services:
     stop_grace_period: 15s
 
 networks:
-  dfsnet:
-    name: dfsnet
+  dfs-net:
+    name: dfs-net
     external: false
     ipam:
       driver: default

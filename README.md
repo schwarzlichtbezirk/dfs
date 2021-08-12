@@ -29,14 +29,14 @@ Folder `github.com\schwarzlichtbezirk\dfs\tool` contains batch helpers to compil
 
 5. Run services.
 ```batch
-start "front" %GOPATH%/bin/dfs.front.x64.exe
-start "node#1" %GOPATH%/bin/dfs.node.x64.exe -p :50051
-start "node#2" %GOPATH%/bin/dfs.node.x64.exe -p :50052
-rem and other nodes instances
+start "DFS front" %GOPATH%/bin/dfs.front.x64.exe
+start "DFS node#1" %GOPATH%/bin/dfs.node.x64.exe -p :50051
+start "DFS node#2" %GOPATH%/bin/dfs.node.x64.exe -p :50052
+rem and start other nodes instances
 ```
 or run `github.com\schwarzlichtbezirk\dfs\tool\start.x64.cmd` batch-file to start composition for default nodes list.
 
-### How to run in docker
+## How to run in docker
 
 1. Change current directory to project root.
 ```batch
@@ -54,7 +54,7 @@ docker build --pull --rm -f "Dockerfile.front" -t dfs-front:latest "."
 docker-compose -f "docker-compose.yaml" up -d --build
 ```
 
-### What its need else to modify code
+## What its need else to modify code
 
 If you want to modify `.go`-code and `.proto` file, you should [download](https://github.com/protocolbuffers/protobuf/blob/master/README.md#protocol-compiler-installation) and install protocol buffer compiler. Then fetch and compile protocol buffer compiler plugins:
 ```batch
