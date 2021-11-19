@@ -17,10 +17,12 @@ RUN update-ca-certificates
 
 # Make project root folder as current dir.
 WORKDIR $GOPATH/src/github.com/schwarzlichtbezirk/dfs/
-# Copy all files and subfolders in current state as is.
-COPY . .
+# Copy only go.mod and go.sum to prevent downloads all dependencies again on any code changes.
+COPY go.* .
 # Download all dependencies pointed at go.mod file.
 RUN go mod download
+# Copy all files and subfolders in current state as is.
+COPY . .
 
 # Build service and put executable.
 RUN go build -o /go/bin/front ./front

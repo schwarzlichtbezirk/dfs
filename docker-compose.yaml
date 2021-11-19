@@ -24,7 +24,7 @@ services:
         aliases:
           - front
     environment:
-      DFSNODES: node1:50051;node2:50052
+      NODELIST: node1:50051;node2:50052
     restart: on-failure
     stop_signal: SIGINT
     stop_grace_period: 15s
@@ -42,7 +42,7 @@ services:
         aliases:
           - node1
     environment:
-      DFSNODEPORT: "50051"
+      NODEPORT: "50051"
     restart: on-failure
     stop_signal: SIGINT
     stop_grace_period: 15s
@@ -60,7 +60,7 @@ services:
         aliases:
           - node2
     environment:
-      DFSNODEPORT: "50052"
+      NODEPORT: "50052"
     restart: on-failure
     stop_signal: SIGINT
     stop_grace_period: 15s

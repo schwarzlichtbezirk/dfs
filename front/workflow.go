@@ -25,7 +25,7 @@ func Run(gmux *Router) {
 	var err error
 
 	// get confiruration path
-	if err = DetectConfigPath(); err != nil {
+	if ConfigPath, err = DetectConfigPath(); err != nil {
 		log.Fatal(err)
 	}
 	log.Printf("config path: %s\n", ConfigPath)
@@ -44,7 +44,7 @@ func Run(gmux *Router) {
 
 	// gets expected nodes list.
 	var nodes []string
-	if s := os.Getenv("DFSNODES"); s != "" {
+	if s := os.Getenv("NODELIST"); s != "" {
 		nodes = strings.Split(s, ";")
 	} else if err = ReadYaml(nodesfile, &nodes); err != nil {
 		log.Fatal(err)

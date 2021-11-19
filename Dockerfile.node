@@ -17,10 +17,12 @@ RUN update-ca-certificates
 
 # Make project root folder as current dir.
 WORKDIR $GOPATH/src/github.com/schwarzlichtbezirk/dfs/
-# Copy all files and subfolders in current state as is.
-COPY . .
+# Copy only go.mod and go.sum to prevent downloads all dependencies again on any code changes.
+COPY go.* .
 # Download all dependencies pointed at go.mod file.
 RUN go mod download
+# Copy all files and subfolders in current state as is.
+COPY . .
 
 # Build service and put executable.
 RUN go build -o /go/bin/node ./node
@@ -32,14 +34,14 @@ RUN go build -o /go/bin/node ./node
 # Thin deploy image.
 FROM gcr.io/distroless/base-debian11
 
-# gRPC listen port is provided by DFSNODEPORT environment variable.
-ENV DFSNODEPORT=50051
+# gRPC listen port is provided by NODEPORT environment variable.
+ENV NODEPORT=50051
 
 # Copy compiled executables to new image destination.
 COPY --from=build /go/bin/node /go/bin/node
 
 # Open gRPC listen port.
-EXPOSE ${DFSNODEPORT}
+EXPOSE ${NODEPORT}
 
 # Run application with full path representation.
 # Without shell to get signal for graceful shutdown.

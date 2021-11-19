@@ -2,10 +2,10 @@ package main
 
 import (
 	"errors"
+	"flag"
 	"log"
 	"os"
 	"path/filepath"
-	"regexp"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -54,7 +54,10 @@ var cfg = Config{ // inits default values:
 }
 
 const (
-	cfgfile   = "dfs-front.yaml"
+	cfgfile = "dfs-front.yaml"
+	cfgbase = "dfs-config"
+	srcpath = "src/github.com/schwarzlichtbezirk/dfs/config"
+
 	nodesfile = "dfs-nodes.yaml"
 )
 
@@ -64,59 +67,84 @@ var ConfigPath string
 // ErrNoCongig is "no configuration path was found" error message.
 var ErrNoCongig = errors.New("no configuration path was found")
 
-// DetectConfigPath finds configuration path.
-func DetectConfigPath() (err error) {
+// DetectConfigPath finds configuration path with existing configuration file at least.
+func DetectConfigPath() (cfgpath string, err error) {
 	var path string
+	var exepath = filepath.Dir(os.Args[0])
+
 	// try to get from environment setting
-	if path = os.Getenv("DFSCONFIGPATH"); path != "" {
-		if ok, _ := pathexists(path); ok {
-			ConfigPath = path
+	if path = envfmt(os.Getenv("CONFIGPATH")); path != "" {
+		// try to get access to full path
+		if ok, _ := pathexists(filepath.Join(path, cfgfile)); ok {
+			cfgpath = path
+			return
+		}
+		// try to find relative from executable path
+		path = filepath.Join(exepath, path)
+		if ok, _ := pathexists(filepath.Join(path, cfgfile)); ok {
+			cfgpath = exepath
 			return
 		}
 		log.Printf("no access to pointed configuration path '%s'\n", path)
 	}
+
+	// try to get from command path arguments
+	if path = *flag.String("d", "", "configuration path"); path != "" {
+		// try to get access to full path
+		if ok, _ := pathexists(filepath.Join(path, cfgfile)); ok {
+			cfgpath = path
+			return
+		}
+		// try to find relative from executable path
+		path = filepath.Join(exepath, path)
+		if ok, _ := pathexists(filepath.Join(path, cfgfile)); ok {
+			cfgpath = exepath
+			return
+		}
+	}
+
 	// try to get from config subdirectory on executable path
-	var exepath = filepath.Dir(os.Args[0])
-	path = filepath.Join(exepath, "dfs-config")
-	if ok, _ := pathexists(path); ok {
-		ConfigPath = path
+	path = filepath.Join(exepath, cfgbase)
+	if ok, _ := pathexists(filepath.Join(path, cfgfile)); ok {
+		cfgpath = path
 		return
 	}
 	// try to find in executable path
 	if ok, _ := pathexists(filepath.Join(exepath, cfgfile)); ok {
-		ConfigPath = exepath
+		cfgpath = exepath
 		return
 	}
 	// try to find in current path
 	if ok, _ := pathexists(cfgfile); ok {
-		ConfigPath = "."
+		cfgpath = "."
 		return
 	}
 
 	// if GOPATH is present
 	if gopath := os.Getenv("GOPATH"); gopath != "" {
 		// try to get from go bin config
-		path = filepath.Join(gopath, "bin/dfs-config")
-		if ok, _ := pathexists(path); ok {
-			ConfigPath = path
+		path = filepath.Join(gopath, "bin", cfgbase)
+		if ok, _ := pathexists(filepath.Join(path, cfgfile)); ok {
+			cfgpath = path
 			return
 		}
 		// try to get from go bin root
 		path = filepath.Join(gopath, "bin")
 		if ok, _ := pathexists(filepath.Join(path, cfgfile)); ok {
-			ConfigPath = path
+			cfgpath = path
 			return
 		}
 		// try to get from source code
-		path = filepath.Join(gopath, "src/github.com/schwarzlichtbezirk/dfs/config")
-		if ok, _ := pathexists(path); ok {
-			ConfigPath = path
+		path = filepath.Join(gopath, srcpath)
+		if ok, _ := pathexists(filepath.Join(path, cfgfile)); ok {
+			cfgpath = path
 			return
 		}
 	}
 
 	// no config was found
-	return ErrNoCongig
+	err = ErrNoCongig
+	return
 }
 
 // ReadYaml reads "data" object from YAML-file with given file path.
@@ -129,23 +157,4 @@ func ReadYaml(fname string, data interface{}) (err error) {
 		return
 	}
 	return
-}
-
-var efre = regexp.MustCompile(`\$\{\w+\}`)
-
-func envfmt(p string) string {
-	return filepath.ToSlash(efre.ReplaceAllStringFunc(p, func(name string) string {
-		return os.Getenv(name[2 : len(name)-1]) // strip ${...} and replace by env value
-	}))
-}
-
-func pathexists(path string) (bool, error) {
-	var err error
-	if _, err = os.Stat(path); err == nil {
-		return true, nil
-	}
-	if os.IsNotExist(err) {
-		return false, nil
-	}
-	return true, err
 }

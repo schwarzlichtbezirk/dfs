@@ -14,6 +14,8 @@ func main() {
 
 	flag.Parse()
 	Run()
+
+	log.Printf("ready")
 	WaitExit()
 	log.Println("shutting down complete.")
 }

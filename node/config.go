@@ -4,6 +4,7 @@ import (
 	"errors"
 	"flag"
 	"os"
+	"strings"
 )
 
 // Config is common service settings.
@@ -21,20 +22,27 @@ var cfg = Config{ // inits default values:
 	PortGRPC: ":50051",
 }
 
-// ErrNoPorts is "no ports were given to node" error message.
-var ErrNoPorts = errors.New("no ports were given to node")
+// ErrNoPorts is "no port was given to node" error message.
+var ErrNoPort = errors.New("no port was given to node")
 
 // DetectPort explores incoming data sources for port that will be used for gRPC.
 func DetectPort() (err error) {
-	if envport := os.Getenv("DFSNODEPORT"); len(envport) > 0 {
-		cfg.PortGRPC = ":" + envport
+	defer func() {
+		if err == nil {
+			if !strings.HasPrefix(cfg.PortGRPC, ":") {
+				cfg.PortGRPC = ":" + cfg.PortGRPC
+			}
+		}
+	}()
+
+	if envport := os.Getenv("NODEPORT"); len(envport) > 0 {
+		cfg.PortGRPC = envport
 		return
 	}
-
 	if len(*portgrpc) > 0 {
 		cfg.PortGRPC = *portgrpc
 		return
 	}
 
-	return ErrNoPorts
+	return ErrNoPort
 }

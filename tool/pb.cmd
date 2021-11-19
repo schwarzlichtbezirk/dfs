@@ -1,6 +1,5 @@
 @echo off
-cd /d %GOPATH%/bin/
-set pbimport=github.com/schwarzlichtbezirk/dfs/pb
-protoc -I=%GOPATH%/src/%pbimport%/^
- --go_out=%GOPATH%/src/ --go-grpc_out=%GOPATH%/src/^
- %GOPATH%/src/%pbimport%/dfs.proto
+set pbsrc=%GOPATH%/src
+set pbpkg=github.com/schwarzlichtbezirk/dfs/pb
+protoc -I=%pbsrc%/%pbpkg% --go_out=%pbsrc% --go-grpc_out=%pbsrc%^
+ %pbsrc%/%pbpkg%/helloworld.proto
