@@ -48,6 +48,7 @@ type Storage struct {
 // Storage is singleton
 var storage Storage
 
+// RunGRPC establishes gRPC connection for given node.
 func (node *NodeInfo) RunGRPC() {
 	exitwg.Add(1)
 	grpcwg.Add(1)
@@ -55,41 +56,38 @@ func (node *NodeInfo) RunGRPC() {
 		defer exitwg.Done()
 
 		var conn *grpc.ClientConn
-		var ok bool
-
-		func() {
+		var err error
+		var ctx, cancel = context.WithCancel(context.Background())
+		go func() {
 			defer grpcwg.Done()
+			defer cancel()
 
-			var err error
 			log.Printf("grpc connection wait on %s\n", node.Addr)
-			var ctx, cancel = context.WithCancel(context.Background())
-			go func() {
-				defer cancel()
-				if conn, err = grpc.DialContext(ctx, node.Addr, grpc.WithInsecure(), grpc.WithBlock()); err != nil {
-					log.Fatalf("fail to dial on %s: %v", node.Addr, err)
-				}
-				node.Client = pb.NewDataGuideClient(conn)
-			}()
-			// wait until connect will be established or have got exit signal
-			select {
-			case <-ctx.Done():
-				log.Printf("grpc connection established on %s\n", node.Addr)
-				ok = true
-			case <-exitchan:
-				log.Printf("grpc connection canceled on %s\n", node.Addr)
-			}
+			conn, err = grpc.DialContext(ctx, node.Addr, grpc.WithInsecure(), grpc.WithBlock())
+			node.Client = pb.NewDataGuideClient(conn)
 		}()
+		// wait until connect will be established or have got exit signal
+		select {
+		case <-ctx.Done():
+			if err != nil {
+				log.Printf("fail to dial on %s: %v", node.Addr, err)
+				exitfn()
+				return
+			}
+			log.Printf("grpc connection established on %s\n", node.Addr)
 
-		if ok {
 			defer conn.Close()
 			// wait for exit signal
-			<-exitchan
+			<-exitctx.Done()
 
 			if err := conn.Close(); err != nil {
 				log.Printf("grpc disconnect on %s: %v\n", node.Addr, err)
 			} else {
 				log.Printf("grpc disconnected on %s\n", node.Addr)
 			}
+
+		case <-exitctx.Done():
+			log.Printf("grpc connection canceled on %s\n", node.Addr)
 		}
 	}()
 }

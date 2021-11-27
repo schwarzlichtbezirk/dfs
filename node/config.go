@@ -39,7 +39,7 @@ func DetectPort() (err error) {
 		cfg.PortGRPC = envport
 		return
 	}
-	if len(*portgrpc) > 0 {
+	if *portgrpc != "" {
 		cfg.PortGRPC = *portgrpc
 		return
 	}

@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"errors"
+	"flag"
 	"log"
 	"net/http"
 	"os"
@@ -12,16 +14,55 @@ import (
 )
 
 var (
-	// channel to indicate about server shutdown
-	exitchan = make(chan struct{})
+	// context to indicate about service shutdown
+	exitctx context.Context
+	exitfn  context.CancelFunc
 	// wait group for all server goroutines
 	exitwg sync.WaitGroup
 	// wait group for grpc goroutines
 	grpcwg sync.WaitGroup
 )
 
-// Run launches server listeners.
-func Run(gmux *Router) {
+// list of nodes
+var nodes []string
+
+// Init performs global data initialisation.
+func Init() {
+	log.Println("starts")
+
+	flag.Parse()
+
+	// create context and wait the break
+	exitctx, exitfn = context.WithCancel(context.Background())
+	go func() {
+		// Make exit signal on function exit.
+		defer exitfn()
+
+		var sigint = make(chan os.Signal, 1)
+		var sigterm = make(chan os.Signal, 1)
+		// We'll accept graceful shutdowns when quit via SIGINT (Ctrl+C) or SIGTERM (Ctrl+/)
+		// SIGKILL, SIGQUIT will not be caught.
+		signal.Notify(sigint, syscall.SIGINT)
+		signal.Notify(sigterm, syscall.SIGTERM)
+		// Block until we receive our signal.
+		select {
+		case <-exitctx.Done():
+			if errors.Is(exitctx.Err(), context.DeadlineExceeded) {
+				log.Println("shutting down by timeout")
+			} else if errors.Is(exitctx.Err(), context.Canceled) {
+				log.Println("shutting down by cancel")
+			} else {
+				log.Printf("shutting down by %s", exitctx.Err().Error())
+			}
+		case <-sigint:
+			log.Println("shutting down by break")
+		case <-sigterm:
+			log.Println("shutting down by process termination")
+		}
+		signal.Stop(sigint)
+		signal.Stop(sigterm)
+	}()
+
 	var err error
 
 	// get confiruration path
@@ -43,7 +84,6 @@ func Run(gmux *Router) {
 	log.Printf("loaded '%s'\n", cfgfile)
 
 	// gets expected nodes list.
-	var nodes []string
 	if s := os.Getenv("NODELIST"); s != "" {
 		nodes = strings.Split(s, ";")
 	} else if err = ReadYaml(nodesfile, &nodes); err != nil {
@@ -51,7 +91,10 @@ func Run(gmux *Router) {
 	}
 	log.Printf("expects %d nodes\n", len(nodes))
 	storage.Nodes = make([]*NodeInfo, len(nodes))
+}
 
+// Run launches server listeners.
+func Run(gmux *Router) {
 	// starts gRPC clients
 	for i, addr := range nodes {
 		var node = &NodeInfo{
@@ -66,7 +109,7 @@ func Run(gmux *Router) {
 
 	// check on exit during grpc connecting
 	select {
-	case <-exitchan:
+	case <-exitctx.Done():
 		return
 	default:
 	}
@@ -95,7 +138,7 @@ func Run(gmux *Router) {
 			}()
 
 			// wait for exit signal
-			<-exitchan
+			<-exitctx.Done()
 
 			// create a deadline to wait for.
 			var ctx, cancel = context.WithTimeout(
@@ -115,21 +158,12 @@ func Run(gmux *Router) {
 	log.Printf("ready")
 }
 
-// WaitBreak blocks goroutine until Ctrl+C will be pressed.
-func WaitBreak() {
-	var sigint = make(chan os.Signal, 1)
-	// We'll accept graceful shutdowns when quit via SIGINT (Ctrl+C) or SIGTERM (Ctrl+/)
-	// SIGKILL, SIGQUIT will not be caught.
-	signal.Notify(sigint, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
-
-	// Block until we receive our signal.
-	<-sigint
-	// Make exit signal.
-	close(exitchan)
-}
-
-// WaitExit performs graceful network shutdown,
+// Done performs graceful network shutdown,
 // waits until all server threads will be stopped.
-func WaitExit() {
+func Done() {
+	// wait for exit signal
+	<-exitctx.Done()
+	// wait until all server threads will be stopped.
 	exitwg.Wait()
+	log.Println("shutting down complete.")
 }
