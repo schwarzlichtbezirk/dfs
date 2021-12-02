@@ -63,7 +63,7 @@ const (
 )
 
 // Path given from command line parameter.
-var cmdpath = flag.String("d", "", "configuration path")
+var cmdpath = flag.String("c", "", "configuration path")
 
 // ConfigPath determines configuration path, depended on what directory is exist.
 var ConfigPath string
@@ -102,7 +102,7 @@ func DetectConfigPath() (cfgpath string, err error) {
 		// try to find relative from executable path
 		path = filepath.Join(exepath, path)
 		if ok, _ := pathexists(filepath.Join(path, cfgfile)); ok {
-			cfgpath = exepath
+			cfgpath = path
 			return
 		}
 	}
