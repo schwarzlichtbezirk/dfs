@@ -26,7 +26,7 @@ var (
 // list of nodes
 var nodes []string
 
-// Init performs global data initialisation.
+// Init performs global data initialization.
 func Init() {
 	log.Println("starts")
 

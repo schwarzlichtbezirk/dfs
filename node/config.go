@@ -35,7 +35,7 @@ func DetectPort() (err error) {
 		}
 	}()
 
-	if envport := os.Getenv("NODEPORT"); len(envport) > 0 {
+	if envport, ok := os.LookupEnv("NODEPORT"); ok {
 		cfg.PortGRPC = envport
 		return
 	}

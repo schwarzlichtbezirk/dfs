@@ -1,0 +1,67 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "front build",
+			"group": "build",
+			"linux": {
+				"command": "go",
+				"args": [
+					"build",
+					"-o",
+					"${env:GOPATH}/bin/dfs.front.x64",
+					"-v",
+					"./front"
+				],
+			},
+			"windows": {
+				"command": "go",
+				"args": [
+					"build",
+					"-o",
+					"${env:GOPATH}/bin/dfs.front.x64.exe",
+					"-v",
+					"./front"
+				]
+			},
+			"options": {
+				"cwd": "${workspaceFolder}"
+			}
+		},
+		{
+			"label": "node build",
+			"group": "build",
+			"linux": {
+				"command": "go",
+				"args": [
+					"build",
+					"-o",
+					"{env:GOPATH}/bin/dfs.node.x64",
+					"-v",
+					"./node"
+				],
+			},
+			"windows": {
+				"command": "go",
+				"args": [
+					"build",
+					"-o",
+					"${env:GOPATH}/bin/dfs.node.x64.exe",
+					"-v",
+					"./node"
+				]
+			},
+			"options": {
+				"cwd": "${workspaceFolder}"
+			}
+		},
+		{
+			"label": "build all",
+			"group": "build",
+			"dependsOn": [
+				"front build",
+				"node build"
+			]
+		}
+	]
+}

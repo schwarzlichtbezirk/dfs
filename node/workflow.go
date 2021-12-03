@@ -23,7 +23,7 @@ var (
 	exitwg sync.WaitGroup
 )
 
-// Init performs global data initialisation.
+// Init performs global data initialization.
 func Init() {
 	log.Println("starts")
 
