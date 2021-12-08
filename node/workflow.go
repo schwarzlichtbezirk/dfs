@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"flag"
 	"log"
 	"net"
 	"os"
@@ -26,8 +25,6 @@ var (
 // Init performs global data initialization.
 func Init() {
 	log.Println("starts")
-
-	flag.Parse()
 
 	// create context and wait the break
 	exitctx, exitfn = context.WithCancel(context.Background())
@@ -59,11 +56,6 @@ func Init() {
 		signal.Stop(sigint)
 		signal.Stop(sigterm)
 	}()
-
-	// get port
-	if err := DetectPort(); err != nil {
-		log.Printf("used default port %s", cfg.PortGRPC)
-	}
 }
 
 // Run launches server listeners.

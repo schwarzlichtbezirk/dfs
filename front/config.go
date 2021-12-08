@@ -2,14 +2,19 @@ package main
 
 import (
 	"errors"
-	"flag"
 	"log"
 	"os"
 	"path/filepath"
 	"time"
 
+	"github.com/jessevdk/go-flags"
 	"gopkg.in/yaml.v3"
 )
+
+// CfgCmdLine is command line arguments representation for YAML settings.
+type CfgCmdLine struct {
+	ConfigPath string `json:"config-path" yaml:"config-path" env:"CONFIGPATH" short:"c" long:"cfgpath" description:"configuration path"`
+}
 
 // CfgWebServ is web server settings.
 type CfgWebServ struct {
@@ -31,6 +36,7 @@ type CfgStorage struct {
 
 // Config is common service settings.
 type Config struct {
+	CfgCmdLine `json:"command-line" yaml:"command-line"`
 	CfgWebServ `json:"webserver" yaml:"webserver"`
 	CfgStorage `json:"storage" yaml:"storage"`
 }
@@ -53,17 +59,19 @@ var cfg = Config{ // inits default values:
 	},
 }
 
+func init() {
+	if _, err := flags.Parse(&cfg); err != nil {
+		os.Exit(1)
+	}
+}
+
 const (
-	cfgenv  = "CONFIGPATH"
-	cfgfile = "dfs-front.yaml"
-	cfgbase = "dfs-config"
-	srcpath = "src/github.com/schwarzlichtbezirk/dfs/config"
+	gitname = "dfs"
+	cfgfile = gitname + "-front.yaml"
+	cfgbase = gitname + "-config"
 
-	nodesfile = "dfs-nodes.yaml"
+	nodesfile = gitname + "-nodes.yaml"
 )
-
-// Configuration path given from command line parameter.
-var cfgpath = flag.String("c", "", "configuration path")
 
 // ConfigPath determines configuration path, depended on what directory is exist.
 var ConfigPath string
@@ -78,24 +86,8 @@ func DetectConfigPath() (retpath string, err error) {
 	var exepath = filepath.Dir(os.Args[0])
 
 	// try to get from environment setting
-	if path, ok = os.LookupEnv(cfgenv); ok {
-		path = envfmt(path)
-		// try to get access to full path
-		if ok, _ = pathexists(filepath.Join(path, cfgfile)); ok {
-			retpath = path
-			return
-		}
-		// try to find relative from executable path
-		path = filepath.Join(exepath, path)
-		if ok, _ = pathexists(filepath.Join(path, cfgfile)); ok {
-			retpath = exepath
-			return
-		}
-		log.Printf("no access to pointed configuration path '%s'\n", path)
-	}
-
-	// try to get from command path arguments
-	if path = *cfgpath; path != "" {
+	if cfg.ConfigPath != "" {
+		path = envfmt(cfg.ConfigPath)
 		// try to get access to full path
 		if ok, _ = pathexists(filepath.Join(path, cfgfile)); ok {
 			retpath = path
@@ -107,6 +99,7 @@ func DetectConfigPath() (retpath string, err error) {
 			retpath = path
 			return
 		}
+		log.Printf("no access to pointed configuration path '%s'\n", cfg.ConfigPath)
 	}
 
 	// try to get from config subdirectory on executable path
@@ -125,9 +118,31 @@ func DetectConfigPath() (retpath string, err error) {
 		retpath = "."
 		return
 	}
+	// try to find config in current path
+	if ok, _ = pathexists(filepath.Join(cfgbase, cfgfile)); ok {
+		retpath = cfgbase
+		return
+	}
+	// check up current path is the git root path
+	if ok, _ = pathexists(filepath.Join("config", cfgfile)); ok {
+		retpath = "config"
+		return
+	}
+	// check up running in devcontainer workspace
+	path = filepath.Join("/workspaces", gitname, "config")
+	if ok, _ = pathexists(filepath.Join(path, cfgfile)); ok {
+		retpath = path
+		return
+	}
 
-	// if GOBIN is present
-	if gobin, ok := os.LookupEnv("GOBIN"); ok {
+	// if GOBIN or GOPATH is present
+	var gobin string
+	if gobin, ok = os.LookupEnv("GOBIN"); !ok {
+		if gobin, ok = os.LookupEnv("GOPATH"); ok {
+			gobin = filepath.Join(gobin, "bin")
+		}
+	}
+	if ok {
 		// try to get from go bin config
 		path = filepath.Join(gobin, cfgbase)
 		if ok, _ = pathexists(filepath.Join(path, cfgfile)); ok {
@@ -136,28 +151,6 @@ func DetectConfigPath() (retpath string, err error) {
 		// try to get from go bin root
 		if ok, _ = pathexists(filepath.Join(gobin, cfgfile)); ok {
 			retpath = gobin
-			return
-		}
-	}
-
-	// if GOPATH is present
-	if gopath, ok := os.LookupEnv("GOPATH"); ok {
-		// try to get from go bin config
-		path = filepath.Join(gopath, "bin", cfgbase)
-		if ok, _ = pathexists(filepath.Join(path, cfgfile)); ok {
-			retpath = path
-			return
-		}
-		// try to get from go bin root
-		path = filepath.Join(gopath, "bin")
-		if ok, _ = pathexists(filepath.Join(path, cfgfile)); ok {
-			retpath = path
-			return
-		}
-		// try to get from source code
-		path = filepath.Join(gopath, srcpath)
-		if ok, _ = pathexists(filepath.Join(path, cfgfile)); ok {
-			retpath = path
 			return
 		}
 	}

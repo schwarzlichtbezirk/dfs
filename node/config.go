@@ -1,48 +1,23 @@
 package main
 
 import (
-	"errors"
-	"flag"
 	"os"
 	"strings"
-)
 
-// Config is common service settings.
-type Config struct {
-	PortGRPC string `json:"port-grpc" yaml:"port-grpc"`
-}
-
-// Command line parameters
-var (
-	portgrpc = flag.String("p", "", "port used by this node for gRPC exchange")
+	"github.com/jessevdk/go-flags"
 )
 
 // Instance of common service settings.
-var cfg = Config{ // inits default values:
-	PortGRPC: ":50051",
+var cfg struct {
+	PortGRPC string `json:"port-grpc" yaml:"port-grpc" env:"NODEPORT" short:"p" long:"portgrpc" default:":50051" description:"port used by this node for gRPC exchange"`
 }
 
-// ErrNoPorts is "no port was given to node" error message.
-var ErrNoPort = errors.New("no port was given to node")
-
-// DetectPort explores incoming data sources for port that will be used for gRPC.
-func DetectPort() (err error) {
-	defer func() {
-		if err == nil {
-			if !strings.HasPrefix(cfg.PortGRPC, ":") {
-				cfg.PortGRPC = ":" + cfg.PortGRPC
-			}
-		}
-	}()
-
-	if envport, ok := os.LookupEnv("NODEPORT"); ok {
-		cfg.PortGRPC = envport
-		return
+func init() {
+	if _, err := flags.Parse(&cfg); err != nil {
+		os.Exit(1)
 	}
-	if *portgrpc != "" {
-		cfg.PortGRPC = *portgrpc
-		return
+	// correct config
+	if !strings.HasPrefix(cfg.PortGRPC, ":") {
+		cfg.PortGRPC = ":" + cfg.PortGRPC
 	}
-
-	return ErrNoPort
 }

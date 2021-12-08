@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"flag"
 	"log"
 	"net/http"
 	"os"
@@ -29,8 +28,6 @@ var nodes []string
 // Init performs global data initialization.
 func Init() {
 	log.Println("starts")
-
-	flag.Parse()
 
 	// create context and wait the break
 	exitctx, exitfn = context.WithCancel(context.Background())
