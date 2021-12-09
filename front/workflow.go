@@ -7,9 +7,10 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"strings"
 	"sync"
 	"syscall"
+
+	"github.com/jessevdk/go-flags"
 )
 
 var (
@@ -21,9 +22,6 @@ var (
 	// wait group for grpc goroutines
 	grpcwg sync.WaitGroup
 )
-
-// list of nodes
-var nodes []string
 
 // Init performs global data initialization.
 func Init() {
@@ -60,40 +58,42 @@ func Init() {
 		signal.Stop(sigterm)
 	}()
 
-	var err error
-
-	// get confiruration path
-	if ConfigPath, err = DetectConfigPath(); err != nil {
-		log.Fatal(err)
-	}
-	log.Printf("config path: %s\n", ConfigPath)
-
 	// load content of Config structure from YAML-file.
-	if err = ReadYaml(cfgfile, &cfg); err != nil {
-		log.Fatalf("can not read '%s' file: %v\n", cfgfile, err)
+	if !cfg.NoConfig {
+		var err error
+
+		// get confiruration path
+		if ConfigPath, err = DetectConfigPath(); err != nil {
+			log.Fatal(err)
+		}
+		log.Printf("config path: %s\n", ConfigPath)
+
+		if err = ReadYaml(cfgfile, &cfg); err != nil {
+			log.Fatalf("can not read '%s' file: %v\n", cfgfile, err)
+		}
+		log.Printf("loaded '%s'\n", cfgfile)
+		// second iteration, rewrite settings from config file
+		if _, err = flags.NewParser(&cfg, flags.PassDoubleDash).Parse(); err != nil {
+			panic("no way to here")
+		}
 	}
+	// correct config
 	if cfg.MinNodeChunkSize <= 0 {
 		cfg.MinNodeChunkSize = 4 * 1024
+		log.Printf("'min-node-chunk-size' is adjusted to %d\n", cfg.MinNodeChunkSize)
 	}
 	if cfg.StreamChunkSize <= 0 {
 		cfg.StreamChunkSize = 512
+		log.Printf("'stream-chunk-size' is adjusted to %d\n", cfg.StreamChunkSize)
 	}
-	log.Printf("loaded '%s'\n", cfgfile)
-
-	// gets expected nodes list.
-	if s := os.Getenv("NODELIST"); s != "" {
-		nodes = strings.Split(s, ";")
-	} else if err = ReadYaml(nodesfile, &nodes); err != nil {
-		log.Fatal(err)
-	}
-	log.Printf("expects %d nodes\n", len(nodes))
-	storage.Nodes = make([]*NodeInfo, len(nodes))
+	log.Printf("expects %d nodes\n", len(cfg.NodeList))
+	storage.Nodes = make([]*NodeInfo, len(cfg.NodeList))
 }
 
 // Run launches server listeners.
 func Run(gmux *Router) {
 	// starts gRPC clients
-	for i, addr := range nodes {
+	for i, addr := range cfg.NodeList {
 		var node = &NodeInfo{
 			Addr:    addr,
 			SumSize: 0,

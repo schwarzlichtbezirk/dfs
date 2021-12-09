@@ -37,7 +37,7 @@ FROM gcr.io/distroless/base-debian11
 # Copy compiled executables to new image destination.
 COPY --from=build /go/bin/front /go/bin/front
 # Copy configuration files.
-COPY --from=build /go/src/github.com/schwarzlichtbezirk/dfs/config/*.* /go/bin/dfs-config/
+COPY --from=build /go/src/github.com/schwarzlichtbezirk/dfs/config/* /go/bin/dfs-config/
 
 # Open REST listen ports.
 EXPOSE 8008 8010
