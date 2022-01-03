@@ -27,6 +27,8 @@ storage:
     min-node-chunk-size: 4096 # 4K
     # Maximum chunk size to send to each node during the streaming.
     stream-chunk-size: 1024
+    # gRPC API call timeout.
+    api-timeout: 2s
 node-list: # Distributed file server list of nodes.
     - localhost:50051
     - localhost:50052

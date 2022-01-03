@@ -20,6 +20,7 @@ const (
 	AECbadbody
 	AECnoreq
 	AECbadjson
+	AECpanic
 
 	// upload
 	AECuploadform
@@ -206,7 +207,7 @@ func uploadAPI(w http.ResponseWriter, r *http.Request) {
 			var node = storage.Nodes[rng.NodeId]
 			storage.nodmux.RUnlock()
 			if stream, err = node.Client.Write(ctx); err != nil {
-				errs[i] = &ErrAjax{err, AECuploadwrite}
+				errs[i] = MakeAjaxErr(err, AECuploadwrite)
 				return
 			}
 			var cs = rng.To - rng.From
@@ -221,7 +222,7 @@ func uploadAPI(w http.ResponseWriter, r *http.Request) {
 				//fmux.Unlock()
 
 				if err != nil {
-					errs[i] = &ErrAjax{err, AECuploadbuf1}
+					errs[i] = MakeAjaxErr(err, AECuploadbuf1)
 					return
 				}
 				var chunk = pb.Chunk{
@@ -234,7 +235,7 @@ func uploadAPI(w http.ResponseWriter, r *http.Request) {
 					Value: buf,
 				}
 				if err := stream.Send(&chunk); err != nil {
-					errs[i] = &ErrAjax{err, AECuploadsend1}
+					errs[i] = MakeAjaxErr(err, AECuploadsend1)
 					return
 				}
 			}
@@ -247,7 +248,7 @@ func uploadAPI(w http.ResponseWriter, r *http.Request) {
 				//fmux.Unlock()
 
 				if err != nil {
-					errs[i] = &ErrAjax{err, AECuploadbuf2}
+					errs[i] = MakeAjaxErr(err, AECuploadbuf2)
 					return
 				}
 				var chunk = pb.Chunk{
@@ -260,13 +261,13 @@ func uploadAPI(w http.ResponseWriter, r *http.Request) {
 					Value: buf,
 				}
 				if err := stream.Send(&chunk); err != nil {
-					errs[i] = &ErrAjax{err, AECuploadsend2}
+					errs[i] = MakeAjaxErr(err, AECuploadsend2)
 					return
 				}
 			}
 			var reply *pb.Summary
 			if reply, err = stream.CloseAndRecv(); err != nil {
-				errs[i] = &ErrAjax{err, AECuploadreply}
+				errs[i] = MakeAjaxErr(err, AECuploadreply)
 				return
 			}
 			log.Printf("chunk %d, size %d, time %v", i, cs, time.Duration(reply.ElapsedTime))
@@ -280,7 +281,7 @@ func uploadAPI(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			// try to remove all stored chunks to prevent garbage accumulation
 			for _, rng := range info.Chunks {
-				ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+				ctx, cancel := context.WithTimeout(context.Background(), cfg.ApiTimeout)
 				defer cancel()
 				storage.nodmux.RLock()
 				var node = storage.Nodes[rng.NodeId]
@@ -380,7 +381,7 @@ func removeAPI(w http.ResponseWriter, r *http.Request) {
 	storage.DelFileInfo(ret) // file data can not be accessed after it
 	// try to remove all chunks
 	for _, rng := range ret.Chunks {
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), cfg.ApiTimeout)
 		defer cancel()
 		storage.nodmux.RLock()
 		var node = storage.Nodes[rng.NodeId]
@@ -412,7 +413,7 @@ func clearAPI(w http.ResponseWriter, r *http.Request) {
 
 		// Try to purge all nodes
 		for _, node := range storage.Nodes {
-			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			ctx, cancel := context.WithTimeout(context.Background(), cfg.ApiTimeout)
 			defer cancel()
 			if _, err1 := node.Client.Purge(ctx, &pb.Empty{}); err1 != nil {
 				err = err1 // save error for future break

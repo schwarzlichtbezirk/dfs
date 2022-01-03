@@ -1,8 +1,9 @@
 package main
 
 import (
+	"errors"
+	"io/fs"
 	"os"
-	"path/filepath"
 	"regexp"
 )
 
@@ -13,7 +14,7 @@ var (
 )
 
 func envfmt(p string) string {
-	return filepath.ToSlash(evwre.ReplaceAllStringFunc(evure.ReplaceAllStringFunc(evlre.ReplaceAllStringFunc(p, func(name string) string {
+	return evwre.ReplaceAllStringFunc(evure.ReplaceAllStringFunc(evlre.ReplaceAllStringFunc(p, func(name string) string {
 		// strip $VAR and replace by environment value
 		if val, ok := os.LookupEnv(name[1:]); ok {
 			return val
@@ -34,7 +35,7 @@ func envfmt(p string) string {
 		} else {
 			return name
 		}
-	}))
+	})
 }
 
 func pathexists(path string) (bool, error) {
@@ -42,7 +43,7 @@ func pathexists(path string) (bool, error) {
 	if _, err = os.Stat(path); err == nil {
 		return true, nil
 	}
-	if os.IsNotExist(err) {
+	if errors.Is(err, fs.ErrNotExist) {
 		return false, nil
 	}
 	return true, err

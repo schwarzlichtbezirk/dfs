@@ -111,7 +111,7 @@ func Run(gmux *Router) {
 	default:
 	}
 
-	// starts HTTP servers
+	// starts HTTP listeners
 	for _, addr := range cfg.PortHTTP {
 		var addr = envfmt(addr) // localize
 		exitwg.Add(1)
@@ -138,9 +138,7 @@ func Run(gmux *Router) {
 			<-exitctx.Done()
 
 			// create a deadline to wait for.
-			var ctx, cancel = context.WithTimeout(
-				context.Background(),
-				cfg.ShutdownTimeout)
+			var ctx, cancel = context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
 			defer cancel()
 
 			server.SetKeepAlivesEnabled(false)

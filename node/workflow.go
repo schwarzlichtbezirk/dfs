@@ -60,6 +60,8 @@ func Init() {
 
 // Run launches server listeners.
 func Run() {
+	var grpcctx, grpccancel = context.WithCancel(context.Background())
+
 	// starts gRPC servers
 	exitwg.Add(1)
 	go func() {
@@ -74,6 +76,7 @@ func Run() {
 		var server = grpc.NewServer()
 		pb.RegisterDataGuideServer(server, &routeDataGuideServer{addr: cfg.PortGRPC})
 		go func() {
+			grpccancel()
 			if err := server.Serve(lis); err != nil {
 				log.Fatalf("failed to serve: %v", err)
 			}
@@ -87,7 +90,12 @@ func Run() {
 		log.Printf("grpc server %s closed\n", cfg.PortGRPC)
 	}()
 
-	log.Println("ready")
+	select {
+	case <-grpcctx.Done():
+		log.Printf("grpc ready")
+	case <-exitctx.Done():
+		return
+	}
 }
 
 // Done performs graceful network shutdown,

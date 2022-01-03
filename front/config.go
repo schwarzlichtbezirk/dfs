@@ -30,9 +30,10 @@ type CfgWebServ struct {
 }
 
 type CfgStorage struct {
-	NodeFluidFill    bool  `json:"node-fluid-fill" yaml:"node-fluid-fill" long:"nff" description:"Points to fill nodes by fluid algorithm."`
-	MinNodeChunkSize int64 `json:"min-node-chunk-size" yaml:"min-node-chunk-size" long:"mncs" description:"Minimum size of chunk to divide the file and put to nodes, except last chunk."`
-	StreamChunkSize  int64 `json:"stream-chunk-size" yaml:"stream-chunk-size" long:"scs" description:"Maximum chunk size to send to each node during the streaming."`
+	NodeFluidFill    bool          `json:"node-fluid-fill" yaml:"node-fluid-fill" long:"nff" description:"Points to fill nodes by fluid algorithm."`
+	MinNodeChunkSize int64         `json:"min-node-chunk-size" yaml:"min-node-chunk-size" long:"mncs" description:"Minimum size of chunk to divide the file and put to nodes, except last chunk."`
+	StreamChunkSize  int64         `json:"stream-chunk-size" yaml:"stream-chunk-size" long:"scs" description:"Maximum chunk size to send to each node during the streaming."`
+	ApiTimeout       time.Duration `json:"api-timeout" yaml:"api-timeout"`
 }
 
 // Config is common service settings.
@@ -59,6 +60,7 @@ var cfg = Config{ // inits default values:
 		NodeFluidFill:    true,
 		MinNodeChunkSize: 4 * 1024,
 		StreamChunkSize:  1024,
+		ApiTimeout:       2 * time.Second,
 	},
 }
 

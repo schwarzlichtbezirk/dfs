@@ -50,8 +50,8 @@ var storage Storage
 
 // RunGRPC establishes gRPC connection for given node.
 func (node *NodeInfo) RunGRPC() {
-	exitwg.Add(1)
 	grpcwg.Add(1)
+	exitwg.Add(1)
 	go func() {
 		defer exitwg.Done()
 
@@ -69,25 +69,25 @@ func (node *NodeInfo) RunGRPC() {
 		// wait until connect will be established or have got exit signal
 		select {
 		case <-ctx.Done():
-			if err != nil {
-				log.Printf("fail to dial on %s: %v", node.Addr, err)
-				exitfn()
-				return
-			}
-			log.Printf("grpc connection established on %s\n", node.Addr)
-
-			defer conn.Close()
-			// wait for exit signal
-			<-exitctx.Done()
-
-			if err := conn.Close(); err != nil {
-				log.Printf("grpc disconnect on %s: %v\n", node.Addr, err)
-			} else {
-				log.Printf("grpc disconnected on %s\n", node.Addr)
-			}
-
 		case <-exitctx.Done():
 			log.Printf("grpc connection canceled on %s\n", node.Addr)
+			return
+		}
+
+		if err != nil {
+			log.Printf("fail to dial on %s: %v", node.Addr, err)
+			exitfn()
+			return
+		}
+		log.Printf("grpc connection established on %s\n", node.Addr)
+
+		// wait for exit signal
+		<-exitctx.Done()
+
+		if err := conn.Close(); err != nil {
+			log.Printf("grpc disconnect on %s: %v\n", node.Addr, err)
+		} else {
+			log.Printf("grpc disconnected on %s\n", node.Addr)
 		}
 	}()
 }
