@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -11,6 +10,7 @@ import (
 	"syscall"
 
 	"github.com/jessevdk/go-flags"
+	"google.golang.org/grpc/grpclog"
 )
 
 var (
@@ -23,9 +23,13 @@ var (
 	grpcwg sync.WaitGroup
 )
 
+func init() {
+	grpclog.SetLoggerV2(grpclog.NewLoggerV2(os.Stdout, os.Stderr, os.Stderr))
+}
+
 // Init performs global data initialization.
 func Init() {
-	log.Println("starts")
+	grpclog.Infoln("starts")
 
 	// create context and wait the break
 	exitctx, exitfn = context.WithCancel(context.Background())
@@ -43,16 +47,16 @@ func Init() {
 		select {
 		case <-exitctx.Done():
 			if errors.Is(exitctx.Err(), context.DeadlineExceeded) {
-				log.Println("shutting down by timeout")
+				grpclog.Infoln("shutting down by timeout")
 			} else if errors.Is(exitctx.Err(), context.Canceled) {
-				log.Println("shutting down by cancel")
+				grpclog.Infoln("shutting down by cancel")
 			} else {
-				log.Printf("shutting down by %s", exitctx.Err().Error())
+				grpclog.Infoln("shutting down by %s", exitctx.Err().Error())
 			}
 		case <-sigint:
-			log.Println("shutting down by break")
+			grpclog.Infoln("shutting down by break")
 		case <-sigterm:
-			log.Println("shutting down by process termination")
+			grpclog.Infoln("shutting down by process termination")
 		}
 		signal.Stop(sigint)
 		signal.Stop(sigterm)
@@ -64,14 +68,14 @@ func Init() {
 
 		// get confiruration path
 		if ConfigPath, err = DetectConfigPath(); err != nil {
-			log.Fatal(err)
+			grpclog.Fatal(err)
 		}
-		log.Printf("config path: %s\n", ConfigPath)
+		grpclog.Infof("config path: %s\n", ConfigPath)
 
 		if err = ReadYaml(cfgfile, &cfg); err != nil {
-			log.Fatalf("can not read '%s' file: %v\n", cfgfile, err)
+			grpclog.Fatalf("can not read '%s' file: %v\n", cfgfile, err)
 		}
-		log.Printf("loaded '%s'\n", cfgfile)
+		grpclog.Infof("loaded '%s'\n", cfgfile)
 		// second iteration, rewrite settings from config file
 		if _, err = flags.NewParser(&cfg, flags.PassDoubleDash).Parse(); err != nil {
 			panic("no way to here")
@@ -80,13 +84,13 @@ func Init() {
 	// correct config
 	if cfg.MinNodeChunkSize <= 0 {
 		cfg.MinNodeChunkSize = 4 * 1024
-		log.Printf("'min-node-chunk-size' is adjusted to %d\n", cfg.MinNodeChunkSize)
+		grpclog.Warningf("'min-node-chunk-size' is adjusted to %d\n", cfg.MinNodeChunkSize)
 	}
 	if cfg.StreamChunkSize <= 0 {
 		cfg.StreamChunkSize = 512
-		log.Printf("'stream-chunk-size' is adjusted to %d\n", cfg.StreamChunkSize)
+		grpclog.Warningf("'stream-chunk-size' is adjusted to %d\n", cfg.StreamChunkSize)
 	}
-	log.Printf("expects %d nodes\n", len(cfg.NodeList))
+	grpclog.Infof("expects %d nodes\n", len(cfg.NodeList))
 	storage.Nodes = make([]*NodeInfo, len(cfg.NodeList))
 }
 
@@ -128,9 +132,9 @@ func Run(gmux *Router) {
 				MaxHeaderBytes:    cfg.MaxHeaderBytes,
 			}
 			go func() {
-				log.Printf("start http on %s\n", addr)
+				grpclog.Infof("start http on %s\n", addr)
 				if err := server.ListenAndServe(); err != http.ErrServerClosed {
-					log.Fatalf("failed to serve: %v", err)
+					grpclog.Fatalf("failed to serve: %v", err)
 				}
 			}()
 
@@ -143,14 +147,14 @@ func Run(gmux *Router) {
 
 			server.SetKeepAlivesEnabled(false)
 			if err := server.Shutdown(ctx); err != nil {
-				log.Printf("shutdown http on %s: %v\n", addr, err)
+				grpclog.Errorf("shutdown http on %s: %v\n", addr, err)
 			} else {
-				log.Printf("stop http on %s\n", addr)
+				grpclog.Infof("stop http on %s\n", addr)
 			}
 		}()
 	}
 
-	log.Printf("ready")
+	grpclog.Infoln("ready")
 }
 
 // Done performs graceful network shutdown,
@@ -160,5 +164,5 @@ func Done() {
 	<-exitctx.Done()
 	// wait until all server threads will be stopped.
 	exitwg.Wait()
-	log.Println("shutting down complete.")
+	grpclog.Infoln("shutting down complete.")
 }

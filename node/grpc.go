@@ -4,11 +4,11 @@ import (
 	"context"
 	"errors"
 	"io"
-	"log"
 	"sync"
 	"time"
 
 	"github.com/schwarzlichtbezirk/dfs/pb"
+	"google.golang.org/grpc/grpclog"
 )
 
 // Storage is singleton, files database with fileID/Chunk keys/values.
@@ -47,7 +47,7 @@ func (s *routeDataGuideServer) Write(stream pb.DataGuide_WriteServer) error {
 	for {
 		var chunk, err = stream.Recv()
 		if err == io.EOF {
-			log.Printf("fetched %d items\n", count)
+			grpclog.Infof("fetched %d items\n", count)
 			var endTime = time.Now()
 			return stream.SendAndClose(&pb.Summary{
 				ChunkCount:  count,

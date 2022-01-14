@@ -5,13 +5,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"runtime"
 	"sync"
 	"time"
 
 	"github.com/gorilla/mux"
+	"google.golang.org/grpc/grpclog"
 )
 
 type void = struct{}
@@ -32,17 +32,28 @@ func (e *jerr) MarshalJSON() ([]byte, error) {
 
 // ErrAjax is error object on AJAX API handlers calls.
 type ErrAjax struct {
-	What jerr  `json:"what"`
-	When int64 `json:"when"`
-	Code int   `json:"code,omitempty"`
+	What jerr   `json:"what"`           // message with problem description
+	When int64  `json:"when"`           // time of error rising, in milliseconds of UNIX format
+	Code int    `json:"code,omitempty"` // unique API error code
+	Info string `json:"info,omitempty"` // URL with problem detailed description
 }
 
-// MakeAjaxErr is ErrAjax constructor.
+// MakeAjaxErr is ErrAjax simple constructor.
 func MakeAjaxErr(what error, code int) *ErrAjax {
 	return &ErrAjax{
 		What: jerr{what},
 		When: UnixJSNow(),
 		Code: code,
+	}
+}
+
+// MakeAjaxInfo is ErrAjax constructor with info URL.
+func MakeAjaxInfo(what error, code int, info string) *ErrAjax {
+	return &ErrAjax{
+		What: jerr{what},
+		When: UnixJSNow(),
+		Code: code,
+		Info: info,
 	}
 }
 
@@ -213,7 +224,7 @@ func AjaxMiddleware(next http.Handler) http.Handler {
 				var buf [2048]byte
 				var stacklen = runtime.Stack(buf[:], false)
 				var str = string(buf[:stacklen])
-				log.Println(str)
+				grpclog.Errorln(str)
 				WriteJSON(w, http.StatusInternalServerError, MakeErrPanic(err, AECpanic, str))
 			}
 		}()

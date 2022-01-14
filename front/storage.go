@@ -4,13 +4,14 @@ import (
 	"context"
 	"errors"
 	"io"
-	"log"
 	"mime/multipart"
 	"sync"
 	"sync/atomic"
 
 	"github.com/schwarzlichtbezirk/dfs/pb"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/grpclog"
 )
 
 // FileInfo is file information about chunks placed at nodes.
@@ -62,32 +63,36 @@ func (node *NodeInfo) RunGRPC() {
 			defer grpcwg.Done()
 			defer cancel()
 
-			log.Printf("grpc connection wait on %s\n", node.Addr)
-			conn, err = grpc.DialContext(ctx, node.Addr, grpc.WithInsecure(), grpc.WithBlock())
+			grpclog.Infof("grpc connection wait on %s\n", node.Addr)
+			var options = []grpc.DialOption{
+				grpc.WithTransportCredentials(insecure.NewCredentials()),
+				grpc.WithBlock(),
+			}
+			conn, err = grpc.DialContext(ctx, node.Addr, options...)
 			node.Client = pb.NewDataGuideClient(conn)
 		}()
 		// wait until connect will be established or have got exit signal
 		select {
 		case <-ctx.Done():
 		case <-exitctx.Done():
-			log.Printf("grpc connection canceled on %s\n", node.Addr)
+			grpclog.Infof("grpc connection canceled on %s\n", node.Addr)
 			return
 		}
 
 		if err != nil {
-			log.Printf("fail to dial on %s: %v", node.Addr, err)
+			grpclog.Errorf("fail to dial on %s: %v", node.Addr, err)
 			exitfn()
 			return
 		}
-		log.Printf("grpc connection established on %s\n", node.Addr)
+		grpclog.Infof("grpc connection established on %s\n", node.Addr)
 
 		// wait for exit signal
 		<-exitctx.Done()
 
 		if err := conn.Close(); err != nil {
-			log.Printf("grpc disconnect on %s: %v\n", node.Addr, err)
+			grpclog.Errorf("grpc disconnect on %s: %v\n", node.Addr, err)
 		} else {
-			log.Printf("grpc disconnected on %s\n", node.Addr)
+			grpclog.Infof("grpc disconnected on %s\n", node.Addr)
 		}
 	}()
 }
@@ -164,6 +169,7 @@ func (s *Storage) Clear() {
 // FindByName returns ID of first founded file record with given name, or 0 if it is not found.
 func (s *Storage) FindIdByName(name string) (fid int64) {
 	s.FIMap.Range(func(key interface{}, value interface{}) bool {
+		_ = key
 		var fi = value.(*FileInfo)
 		if fi.Name == name {
 			fid = fi.FileID

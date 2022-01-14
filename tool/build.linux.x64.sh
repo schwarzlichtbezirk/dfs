@@ -1,5 +1,5 @@
 #!/bin/bash
-cd $GOPATH/src/github.com/schwarzlichtbezirk/dfs
+cd $(dirname $0)/..
 mkdir -pv $GOPATH/bin/dfs-config
 cp -ruv ./config/* $GOPATH/bin/dfs-config
 go env -w GOOS=linux GOARCH=amd64

@@ -11,7 +11,7 @@ Front have REST API, and can be accessed outside of composition by this API.
 
 ## How to run on localhost
 
-1. First of all install [Golang](https://golang.org/) of last version. Requires that [GOPATH is set](https://golang.org/doc/code.html#GOPATH).
+1. First of all install [Golang](https://go.dev/dl/) of last version. Requires that [GOPATH is set](https://golang.org/doc/code.html#GOPATH).
 
 2. Fetch golang `grpc` library.
 

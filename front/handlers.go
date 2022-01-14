@@ -4,12 +4,12 @@ import (
 	"context"
 	"errors"
 	"io"
-	"log"
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/schwarzlichtbezirk/dfs/pb"
+	"google.golang.org/grpc/grpclog"
 )
 
 // API error codes.
@@ -72,6 +72,7 @@ func pingAPI(w http.ResponseWriter, r *http.Request) {
 
 // nodesizeAPI returns array with sum size of all chunks on each nodes.
 func nodesizeAPI(w http.ResponseWriter, r *http.Request) {
+	_ = r
 	storage.nodmux.RLock()
 	var ret = make([]int64, len(storage.Nodes))
 	for i, node := range storage.Nodes {
@@ -94,7 +95,7 @@ func uploadAPI(w http.ResponseWriter, r *http.Request) {
 	defer file.Close()
 
 	var info = storage.MakeFileInfo(handler)
-	log.Printf("upload file: %s, size: %d, mime: %s\n", handler.Filename, handler.Size, info.MIME)
+	grpclog.Infof("upload file: %s, size: %d, mime: %s\n", handler.Filename, handler.Size, info.MIME)
 
 	storage.nodmux.RLock()
 	var nn = int64(len(storage.Nodes)) // nodes number
@@ -147,7 +148,7 @@ func uploadAPI(w http.ResponseWriter, r *http.Request) {
 			var portion = (1 - percent) / float64(nn-1)
 			sizes[i] = int64(float64(handler.Size) * portion)
 			fsum += sizes[i]
-			log.Printf("node#%d, portion=%f, size=%d", i, portion, sizes[i])
+			grpclog.Infof("node#%d, portion=%f, size=%d", i, portion, sizes[i])
 		}
 		// store remainder to first node
 		if fsum < handler.Size {
@@ -270,7 +271,7 @@ func uploadAPI(w http.ResponseWriter, r *http.Request) {
 				errs[i] = MakeAjaxErr(err, AECuploadreply)
 				return
 			}
-			log.Printf("chunk %d, size %d, time %v", i, cs, time.Duration(reply.ElapsedTime))
+			grpclog.Infof("chunk %d, size %d, time %v", i, cs, time.Duration(reply.ElapsedTime))
 			//}()
 		}
 	}()
@@ -400,6 +401,7 @@ func removeAPI(w http.ResponseWriter, r *http.Request) {
 
 // clearAPI deletes all data at storage, purge nodes, and sets files ID counter to 0.
 func clearAPI(w http.ResponseWriter, r *http.Request) {
+	_ = r
 	var err error
 
 	storage.Clear()
@@ -426,7 +428,7 @@ func clearAPI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Println("content is cleared")
+	grpclog.Infoln("content is cleared")
 
 	WriteOK(w, nil)
 }

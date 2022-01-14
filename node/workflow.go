@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"log"
 	"net"
 	"os"
 	"os/signal"
@@ -12,6 +11,7 @@ import (
 
 	"github.com/schwarzlichtbezirk/dfs/pb"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/grpclog"
 )
 
 var (
@@ -22,9 +22,13 @@ var (
 	exitwg sync.WaitGroup
 )
 
+func init() {
+	grpclog.SetLoggerV2(grpclog.NewLoggerV2(os.Stdout, os.Stderr, os.Stderr))
+}
+
 // Init performs global data initialization.
 func Init() {
-	log.Println("starts")
+	grpclog.Infoln("starts")
 
 	// create context and wait the break
 	exitctx, exitfn = context.WithCancel(context.Background())
@@ -42,16 +46,16 @@ func Init() {
 		select {
 		case <-exitctx.Done():
 			if errors.Is(exitctx.Err(), context.DeadlineExceeded) {
-				log.Println("shutting down by timeout")
+				grpclog.Infoln("shutting down by timeout")
 			} else if errors.Is(exitctx.Err(), context.Canceled) {
-				log.Println("shutting down by cancel")
+				grpclog.Infoln("shutting down by cancel")
 			} else {
-				log.Printf("shutting down by %s", exitctx.Err().Error())
+				grpclog.Infof("shutting down by %s", exitctx.Err().Error())
 			}
 		case <-sigint:
-			log.Println("shutting down by break")
+			grpclog.Infoln("shutting down by break")
 		case <-sigterm:
-			log.Println("shutting down by process termination")
+			grpclog.Infoln("shutting down by process termination")
 		}
 		signal.Stop(sigint)
 		signal.Stop(sigterm)
@@ -67,18 +71,18 @@ func Run() {
 	go func() {
 		defer exitwg.Done()
 
-		log.Printf("grpc server %s starts\n", cfg.PortGRPC)
+		grpclog.Infof("grpc server %s starts\n", cfg.PortGRPC)
 		var err error
 		var lis net.Listener
 		if lis, err = net.Listen("tcp", cfg.PortGRPC); err != nil {
-			log.Fatalf("failed to listen: %v", err)
+			grpclog.Fatalf("failed to listen: %v", err)
 		}
 		var server = grpc.NewServer()
 		pb.RegisterDataGuideServer(server, &routeDataGuideServer{addr: cfg.PortGRPC})
 		go func() {
 			grpccancel()
 			if err := server.Serve(lis); err != nil {
-				log.Fatalf("failed to serve: %v", err)
+				grpclog.Fatalf("failed to serve: %v", err)
 			}
 		}()
 
@@ -87,12 +91,12 @@ func Run() {
 
 		server.GracefulStop()
 
-		log.Printf("grpc server %s closed\n", cfg.PortGRPC)
+		grpclog.Infof("grpc server %s closed\n", cfg.PortGRPC)
 	}()
 
 	select {
 	case <-grpcctx.Done():
-		log.Printf("grpc ready")
+		grpclog.Infoln("grpc ready")
 	case <-exitctx.Done():
 		return
 	}
@@ -105,5 +109,5 @@ func Done() {
 	<-exitctx.Done()
 	// wait until all server threads will be stopped.
 	exitwg.Wait()
-	log.Println("shutting down complete.")
+	grpclog.Infoln("shutting down complete.")
 }
