@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -29,6 +30,7 @@ func init() {
 
 // Init performs global data initialization.
 func Init() {
+	grpclog.Infof("version: %s, builton: %s\n", buildvers, builddate)
 	grpclog.Infoln("starts")
 
 	// create context and wait the break
@@ -72,10 +74,12 @@ func Init() {
 		}
 		grpclog.Infof("config path: %s\n", ConfigPath)
 
+		log.Println(cfg.PortHTTP)
 		if err = ReadYaml(cfgfile, &cfg); err != nil {
 			grpclog.Fatalf("can not read '%s' file: %v\n", cfgfile, err)
 		}
 		grpclog.Infof("loaded '%s'\n", cfgfile)
+		log.Println(cfg.PortHTTP)
 		// second iteration, rewrite settings from config file
 		if _, err = flags.NewParser(&cfg, flags.PassDoubleDash).Parse(); err != nil {
 			panic("no way to here")
@@ -116,8 +120,10 @@ func Run(gmux *Router) {
 	}
 
 	// starts HTTP listeners
+	var httpwg sync.WaitGroup
 	for _, addr := range cfg.PortHTTP {
-		var addr = envfmt(addr) // localize
+		var addr = EnvFmt(addr) // localize
+		httpwg.Add(1)
 		exitwg.Add(1)
 		go func() {
 			defer exitwg.Done()
@@ -131,10 +137,12 @@ func Run(gmux *Router) {
 				IdleTimeout:       cfg.IdleTimeout,
 				MaxHeaderBytes:    cfg.MaxHeaderBytes,
 			}
+
+			grpclog.Infof("start http on %s\n", addr)
 			go func() {
-				grpclog.Infof("start http on %s\n", addr)
+				httpwg.Done()
 				if err := server.ListenAndServe(); err != http.ErrServerClosed {
-					grpclog.Fatalf("failed to serve: %v", err)
+					grpclog.Fatalf("failed to serve at all: %v", err)
 				}
 			}()
 
@@ -153,8 +161,8 @@ func Run(gmux *Router) {
 			}
 		}()
 	}
-
-	grpclog.Infoln("ready")
+	httpwg.Wait()
+	grpclog.Infoln("service ready")
 }
 
 // Done performs graceful network shutdown,

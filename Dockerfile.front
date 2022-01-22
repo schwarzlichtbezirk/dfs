@@ -25,7 +25,7 @@ RUN go mod download
 COPY . .
 
 # Build service and put executable.
-RUN go build -o /go/bin/front ./front
+RUN go build -o /go/bin/front -ldflags="-X 'main.buildvers=`cat buildvers.txt`' -X 'main.builddate=$(date +%F)'" ./front
 
 ##
 ## Deploy stage
@@ -37,7 +37,7 @@ FROM gcr.io/distroless/base-debian11
 # Copy compiled executables to new image destination.
 COPY --from=build /go/bin/front /go/bin/front
 # Copy configuration files.
-COPY --from=build /go/src/github.com/schwarzlichtbezirk/dfs/config/* /go/bin/dfs-config/
+COPY --from=build /go/src/github.com/schwarzlichtbezirk/dfs/config/* /go/bin/config/
 
 # Open REST listen ports.
 EXPOSE 8008 8010

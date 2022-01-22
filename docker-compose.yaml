@@ -24,6 +24,7 @@ services:
         aliases:
           - front
     environment:
+      PORTHTTP: :8008;:8010
       NODELIST: node1:50051;node2:50052
     restart: on-failure
     stop_signal: SIGINT

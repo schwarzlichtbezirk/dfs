@@ -1,7 +1,10 @@
 #!/bin/bash
 cd $(dirname $0)/..
-mkdir -pv $GOPATH/bin/dfs-config
-cp -ruv ./config/* $GOPATH/bin/dfs-config
+git describe --tags > buildvers.txt # puts version to file for docker image building
+buildvers=`cat buildvers.txt`
+builddate=$(date +%F)
+mkdir -pv $GOPATH/bin/config
+cp -ruv ./config/* $GOPATH/bin/config
 go env -w GOOS=linux GOARCH=amd64
-go build -o $GOPATH/bin/dfs.front.x64 -v ./front
-go build -o $GOPATH/bin/dfs.node.x64 -v ./node
+go build -o $GOPATH/bin/dfs.front.x64 -v -ldflags="-X 'main.buildvers=%buildvers%' -X 'main.builddate=%builddate%'" ./front
+go build -o $GOPATH/bin/dfs.node.x64 -v -ldflags="-X 'main.buildvers=%buildvers%' -X 'main.builddate=%builddate%'" ./node

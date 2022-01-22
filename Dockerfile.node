@@ -25,7 +25,7 @@ RUN go mod download
 COPY . .
 
 # Build service and put executable.
-RUN go build -o /go/bin/node ./node
+RUN go build -o /go/bin/node -ldflags="-X 'main.buildvers=`cat buildvers.txt`' -X 'main.builddate=$(date +%F)'" ./node
 
 ##
 ## Deploy stage

@@ -28,6 +28,7 @@ func init() {
 
 // Init performs global data initialization.
 func Init() {
+	grpclog.Infof("version: %s, builton: %s\n", buildvers, builddate)
 	grpclog.Infoln("starts")
 
 	// create context and wait the break
@@ -64,9 +65,8 @@ func Init() {
 
 // Run launches server listeners.
 func Run() {
-	var grpcctx, grpccancel = context.WithCancel(context.Background())
-
 	// starts gRPC servers
+	var grpcctx, grpccancel = context.WithCancel(context.Background())
 	exitwg.Add(1)
 	go func() {
 		defer exitwg.Done()
@@ -94,9 +94,10 @@ func Run() {
 		grpclog.Infof("grpc server %s closed\n", cfg.PortGRPC)
 	}()
 
+	// wait until exit or service is ready
 	select {
 	case <-grpcctx.Done():
-		grpclog.Infoln("grpc ready")
+		grpclog.Infoln("service ready")
 	case <-exitctx.Done():
 		return
 	}
