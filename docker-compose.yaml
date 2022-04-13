@@ -1,6 +1,6 @@
 # Build images by followed commands and run composition:
-#    docker build --pull --rm -f "Dockerfile.node" -t dfs-node:latest "."
-#    docker build --pull --rm -f "Dockerfile.front" -t dfs-front:latest "."
+#    docker build --pull --rm -f "node.dockerfile" -t dfs-node:latest "."
+#    docker build --pull --rm -f "front.dockerfile" -t dfs-front:latest "."
 #    docker-compose -f "docker-compose.yaml" up -d --build
 
 version: "3.9"
@@ -11,7 +11,7 @@ services:
     image: dfs-front
     #build:
       #context: .
-      #dockerfile: Dockerfile.front
+      #dockerfile: front.dockerfile
     depends_on:
       - node-svc1
       - node-svc2
@@ -34,7 +34,7 @@ services:
     image: dfs-node
     #build:
       #context: .
-      #dockerfile: Dockerfile.node
+      #dockerfile: node.dockerfile
     #ports:
       #- "50051:50051"
     networks:
@@ -52,7 +52,7 @@ services:
     image: dfs-node
     #build:
       #context: .
-      #dockerfile: Dockerfile.node
+      #dockerfile: node.dockerfile
     #ports:
       #- "50052:50051"
     networks:

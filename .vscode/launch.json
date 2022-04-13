@@ -10,7 +10,8 @@
 			"request": "launch",
 			"mode": "auto",
 			"program": "${workspaceFolder}/node",
-			"args": ["-p=:50051"]
+			"args": ["-p=:50051"],
+			"cwd": "${workspaceFolder}"
 		},
 		{
 			"name": "node#2",
@@ -18,14 +19,16 @@
 			"request": "launch",
 			"mode": "auto",
 			"program": "${workspaceFolder}/node",
-			"args": ["-p=:50052"]
+			"args": ["-p=:50052"],
+			"cwd": "${workspaceFolder}"
 		},
 		{
 			"name": "front",
 			"type": "go",
 			"request": "launch",
 			"mode": "auto",
-			"program": "${workspaceFolder}/front"
+			"program": "${workspaceFolder}/front",
+			"cwd": "${workspaceFolder}"
 		}
 	],
 	"compounds": [

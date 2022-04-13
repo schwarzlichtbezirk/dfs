@@ -27,7 +27,7 @@ Note: if there is no access to `golang.org` host, use VPN (via Netherlands/USA) 
 go get github.com/schwarzlichtbezirk/dfs
 ```
 
-Folder `github.com\schwarzlichtbezirk\dfs\tool` contains batch helpers to compile services for Windows for x86 and amd64 platforms.
+Folder `github.com\schwarzlichtbezirk\dfs\task` contains batch helpers to compile services for Windows for x86 and amd64 platforms.
 
 4. Edit config-file `github.com/schwarzlichtbezirk/dfs/config/dfs-nodes.yaml` with addresses of expected nodes on front startup.
 
@@ -40,7 +40,7 @@ start "DFS node#2" %GOPATH%/bin/dfs.node.x64.exe -p :50052
 rem and start other nodes instances
 ```
 
-or run `github.com\schwarzlichtbezirk\dfs\tool\start.x64.cmd` batch-file to start composition for default nodes list.
+or run `github.com\schwarzlichtbezirk\dfs\task\start.x64.cmd` batch-file to start composition for default nodes list.
 
 ## How to run in docker
 
@@ -53,8 +53,8 @@ cd /d %GOPATH%/src/github.com/schwarzlichtbezirk/dfs
 2. Build docker images for `front` and for `node` services.
 
 ```batch
-docker build --pull --rm -f "Dockerfile.node" -t dfs-node:latest "."
-docker build --pull --rm -f "Dockerfile.front" -t dfs-front:latest "."
+docker build --pull --rm -f "node.dockerfile" -t dfs-node:latest "."
+docker build --pull --rm -f "front.dockerfile" -t dfs-front:latest "."
 ```
 
 3. Then run docker compose file.
@@ -72,7 +72,7 @@ go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
 go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
 ```
 
-To generate protocol buffer code, run `tool/pb.cmd` batch file.
+To generate protocol buffer code, run `task/pb.cmd` batch file.
 
 ## REST API
 

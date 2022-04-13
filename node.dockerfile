@@ -25,7 +25,7 @@ RUN go mod download
 COPY . .
 
 # Build service and put executable.
-RUN go build -o /go/bin/front -ldflags="-X 'main.buildvers=`cat buildvers.txt`' -X 'main.builddate=$(date +%F)'" ./front
+RUN go build -o /go/bin/node -ldflags="-X 'main.buildvers=`cat semver`' -X 'main.builddate=$(date +%F)'" ./node
 
 ##
 ## Deploy stage
@@ -34,14 +34,15 @@ RUN go build -o /go/bin/front -ldflags="-X 'main.buildvers=`cat buildvers.txt`' 
 # Thin deploy image.
 FROM gcr.io/distroless/base-debian11
 
-# Copy compiled executables to new image destination.
-COPY --from=build /go/bin/front /go/bin/front
-# Copy configuration files.
-COPY --from=build /go/src/github.com/schwarzlichtbezirk/dfs/config/* /go/bin/config/
+# gRPC listen port is provided by NODEPORT environment variable.
+ENV NODEPORT=50051
 
-# Open REST listen ports.
-EXPOSE 8008 8010
+# Copy compiled executables to new image destination.
+COPY --from=build /go/bin/node /go/bin/node
+
+# Open gRPC listen port.
+EXPOSE ${NODEPORT}
 
 # Run application with full path representation.
 # Without shell to get signal for graceful shutdown.
-ENTRYPOINT ["/go/bin/front"]
+ENTRYPOINT ["/go/bin/node"]

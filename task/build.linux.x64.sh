@@ -1,8 +1,10 @@
 #!/bin/bash
 cd $(dirname $0)/..
-git describe --tags > buildvers.txt # puts version to file for docker image building
-buildvers=`cat buildvers.txt`
-builddate=$(date +%F)
+
+git describe --tags > semver # puts version to file for docker image building
+buildvers=`cat semver`
+builddate=$(date +'%F')
+
 mkdir -pv $GOPATH/bin/config
 cp -ruv ./config/* $GOPATH/bin/config
 go env -w GOOS=linux GOARCH=amd64
