@@ -4,6 +4,7 @@ import (
 	"errors"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 
@@ -54,6 +55,14 @@ func PathExists(path string) (bool, error) {
 	return true, err
 }
 
+// CheckPath is short variant of path existance check.
+func CheckPath(fpath string, fname string) (string, bool) {
+	if ok, _ := PathExists(path.Join(fpath, fname)); !ok {
+		return "", false
+	}
+	return fpath, true
+}
+
 const cfgbase = "config"
 
 // ConfigPath determines configuration path, depended on what directory is exist.
@@ -65,86 +74,70 @@ var ErrNoCongig = errors.New("no configuration path was found")
 // DetectConfigPath finds configuration path with existing configuration file at least.
 func DetectConfigPath() (retpath string, err error) {
 	var ok bool
-	var path string
-	var exepath = filepath.Dir(os.Args[0])
+	var fpath string
+	var exepath = path.Dir(filepath.ToSlash(os.Args[0]))
 
 	// try to get from environment setting
-	if cfg.ConfigPath != "" {
-		path = EnvFmt(cfg.ConfigPath)
+	if fpath, ok = os.LookupEnv("CONFIGPATH"); ok {
+		fpath = filepath.ToSlash(fpath)
 		// try to get access to full path
-		if ok, _ = PathExists(filepath.Join(path, cfgfile)); ok {
-			retpath = path
+		if retpath, ok = CheckPath(fpath, cfgfile); ok {
 			return
 		}
 		// try to find relative from executable path
-		path = filepath.Join(exepath, path)
-		if ok, _ = PathExists(filepath.Join(path, cfgfile)); ok {
-			retpath = path
+		if retpath, ok = CheckPath(path.Join(exepath, fpath), cfgfile); ok {
 			return
 		}
-		grpclog.Warningf("no access to pointed configuration path '%s'\n", cfg.ConfigPath)
+		grpclog.Warningf("no access to pointed configuration path '%s'\n", fpath)
 	}
 
 	// try to get from config subdirectory on executable path
-	path = filepath.Join(exepath, cfgbase)
-	if ok, _ = PathExists(filepath.Join(path, cfgfile)); ok {
-		retpath = path
+	if retpath, ok = CheckPath(path.Join(exepath, cfgbase), cfgfile); ok {
 		return
 	}
 	// try to find in executable path
-	if ok, _ = PathExists(filepath.Join(exepath, cfgfile)); ok {
-		retpath = exepath
+	if retpath, ok = CheckPath(exepath, cfgfile); ok {
 		return
 	}
 	// try to find in config subdirectory of current path
-	if ok, _ = PathExists(filepath.Join(cfgbase, cfgfile)); ok {
-		retpath = cfgbase
+	if retpath, ok = CheckPath(cfgbase, cfgfile); ok {
 		return
 	}
 	// try to find in current path
-	if ok, _ = PathExists(cfgfile); ok {
-		retpath = "."
+	if retpath, ok = CheckPath(".", cfgfile); ok {
 		return
 	}
 	// check up current path is the git root path
-	if ok, _ = PathExists(filepath.Join(cfgbase, cfgfile)); ok {
-		retpath = cfgbase
+	if retpath, ok = CheckPath(cfgbase, cfgfile); ok {
 		return
 	}
 
 	// check up running in devcontainer workspace
-	path = filepath.Join("/workspaces", gitname, cfgbase)
-	if ok, _ = PathExists(filepath.Join(path, cfgfile)); ok {
-		retpath = path
+	if retpath, ok = CheckPath(path.Join("/workspaces", gitname, cfgbase), cfgfile); ok {
 		return
 	}
 
 	// check up git source path
-	var prefix string
-	if prefix, ok = os.LookupEnv("GOPATH"); ok {
-		path = filepath.Join(prefix, "src", gitpath, cfgbase)
-		if ok, _ = PathExists(filepath.Join(path, cfgfile)); ok {
-			retpath = path
+	if fpath, ok = os.LookupEnv("GOPATH"); ok {
+		if retpath, ok = CheckPath(path.Join(filepath.ToSlash(fpath), "src", gitpath, cfgbase), cfgfile); ok {
 			return
 		}
 	}
 
 	// if GOBIN or GOPATH is present
-	if prefix, ok = os.LookupEnv("GOBIN"); !ok {
-		if prefix, ok = os.LookupEnv("GOPATH"); ok {
-			prefix = filepath.Join(prefix, "bin")
+	if fpath, ok = os.LookupEnv("GOBIN"); !ok {
+		if fpath, ok = os.LookupEnv("GOPATH"); ok {
+			fpath = path.Join(fpath, "bin")
 		}
 	}
 	if ok {
+		fpath = filepath.ToSlash(fpath)
 		// try to get from go bin config
-		path = filepath.Join(prefix, cfgbase)
-		if ok, _ = PathExists(filepath.Join(path, cfgfile)); ok {
-			retpath = path
+		if retpath, ok = CheckPath(path.Join(fpath, cfgbase), cfgfile); ok {
 			return
 		}
 		// try to get from go bin root
-		if ok, _ = PathExists(filepath.Join(prefix, cfgfile)); ok {
-			retpath = prefix
+		if retpath, ok = CheckPath(fpath, cfgfile); ok {
 			return
 		}
 	}

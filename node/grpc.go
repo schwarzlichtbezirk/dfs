@@ -9,6 +9,7 @@ import (
 
 	"github.com/schwarzlichtbezirk/dfs/pb"
 	"google.golang.org/grpc/grpclog"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 // Storage is singleton, files database with fileID/Chunk keys/values.
@@ -87,8 +88,8 @@ func (s *routeDataGuideServer) Remove(ctx context.Context, arg *pb.FileID) (res 
 	return
 }
 
-func (s *routeDataGuideServer) Purge(ctx context.Context, arg *pb.Empty) (res *pb.Empty, err error) {
+func (s *routeDataGuideServer) Purge(ctx context.Context, arg *emptypb.Empty) (res *emptypb.Empty, err error) {
 	storage = sync.Map{}
-	res = &pb.Empty{}
+	res = &emptypb.Empty{}
 	return
 }

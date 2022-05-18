@@ -1,7 +1,9 @@
 syntax = "proto3";
-option go_package = "github.com/schwarzlichtbezirk/dfs/pb";
-
 package dfs;
+option go_package = ".;pb";
+
+import "google/protobuf/empty.proto";
+import "tagger/tagger.proto"; // see: github.com/srikrsna/protoc-gen-gotag
 
 // DataGuide is the service for working with file chunks.
 service DataGuide {
@@ -15,11 +17,7 @@ service DataGuide {
 	// Remove deletes file chunks.
 	rpc Remove(FileID) returns (Range) {}
 	// Purge deleted all file chunks.
-	rpc Purge(Empty) returns (Empty) {}
-}
-
-// Empty is empty message when no needs for any data.
-message Empty {
+	rpc Purge(google.protobuf.Empty) returns (google.protobuf.Empty) {}
 }
 
 // FileID is ID of file.
@@ -29,10 +27,10 @@ message FileID {
 
 // Range contains information about chunk bounds of file with given ID.
 message Range {
-	int64 node_id = 1;
-	int64 file_id = 2;
-	int64 from = 3; // chunk start in file
-	int64 to = 4; // chunk end in file
+	int64 node_id = 1 [(tagger.tags) = "json:\"node_id\""];
+	int64 file_id = 2 [(tagger.tags) = "json:\"file_id\""];
+	int64 from = 3 [(tagger.tags) = "json:\"from\""]; // chunk start in file
+	int64 to = 4 [(tagger.tags) = "json:\"to\""]; // chunk end in file
 }
 
 // Chunk body.

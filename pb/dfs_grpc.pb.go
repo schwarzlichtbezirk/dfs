@@ -11,6 +11,7 @@ import (
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
 // This is a compile-time assertion to ensure that this generated file
@@ -32,7 +33,7 @@ type DataGuideClient interface {
 	// Remove deletes file chunks.
 	Remove(ctx context.Context, in *FileID, opts ...grpc.CallOption) (*Range, error)
 	// Purge deleted all file chunks.
-	Purge(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error)
+	Purge(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type dataGuideClient struct {
@@ -104,8 +105,8 @@ func (c *dataGuideClient) Remove(ctx context.Context, in *FileID, opts ...grpc.C
 	return out, nil
 }
 
-func (c *dataGuideClient) Purge(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error) {
-	out := new(Empty)
+func (c *dataGuideClient) Purge(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	out := new(emptypb.Empty)
 	err := c.cc.Invoke(ctx, "/dfs.DataGuide/Purge", in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -127,7 +128,7 @@ type DataGuideServer interface {
 	// Remove deletes file chunks.
 	Remove(context.Context, *FileID) (*Range, error)
 	// Purge deleted all file chunks.
-	Purge(context.Context, *Empty) (*Empty, error)
+	Purge(context.Context, *emptypb.Empty) (*emptypb.Empty, error)
 	mustEmbedUnimplementedDataGuideServer()
 }
 
@@ -147,7 +148,7 @@ func (UnimplementedDataGuideServer) GetRange(context.Context, *FileID) (*Range, 
 func (UnimplementedDataGuideServer) Remove(context.Context, *FileID) (*Range, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Remove not implemented")
 }
-func (UnimplementedDataGuideServer) Purge(context.Context, *Empty) (*Empty, error) {
+func (UnimplementedDataGuideServer) Purge(context.Context, *emptypb.Empty) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Purge not implemented")
 }
 func (UnimplementedDataGuideServer) mustEmbedUnimplementedDataGuideServer() {}
@@ -244,7 +245,7 @@ func _DataGuide_Remove_Handler(srv interface{}, ctx context.Context, dec func(in
 }
 
 func _DataGuide_Purge_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(Empty)
+	in := new(emptypb.Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -256,7 +257,7 @@ func _DataGuide_Purge_Handler(srv interface{}, ctx context.Context, dec func(int
 		FullMethod: "/dfs.DataGuide/Purge",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(DataGuideServer).Purge(ctx, req.(*Empty))
+		return srv.(DataGuideServer).Purge(ctx, req.(*emptypb.Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }

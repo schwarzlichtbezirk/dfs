@@ -65,26 +65,25 @@ func Init() {
 	}()
 
 	// load content of Config structure from YAML-file.
-	if !cfg.NoConfig {
-		var err error
+	var err error
 
-		// get confiruration path
-		if ConfigPath, err = DetectConfigPath(); err != nil {
-			grpclog.Fatal(err)
-		}
-		grpclog.Infof("config path: %s\n", ConfigPath)
-
-		log.Println(cfg.PortHTTP)
-		if err = ReadYaml(cfgfile, &cfg); err != nil {
-			grpclog.Fatalf("can not read '%s' file: %v\n", cfgfile, err)
-		}
-		grpclog.Infof("loaded '%s'\n", cfgfile)
-		log.Println(cfg.PortHTTP)
-		// second iteration, rewrite settings from config file
-		if _, err = flags.NewParser(&cfg, flags.PassDoubleDash).Parse(); err != nil {
-			panic("no way to here")
-		}
+	// get confiruration path
+	if ConfigPath, err = DetectConfigPath(); err != nil {
+		grpclog.Fatal(err)
 	}
+	grpclog.Infof("config path: %s\n", ConfigPath)
+
+	log.Println(cfg.PortHTTP)
+	if err = ReadYaml(cfgfile, &cfg); err != nil {
+		grpclog.Fatalf("can not read '%s' file: %v\n", cfgfile, err)
+	}
+	grpclog.Infof("loaded '%s'\n", cfgfile)
+	log.Println(cfg.PortHTTP)
+	// second iteration, rewrite settings from config file
+	if _, err = flags.NewParser(&cfg, flags.PassDoubleDash).Parse(); err != nil {
+		panic("no way to here")
+	}
+
 	// correct config
 	if cfg.MinNodeChunkSize <= 0 {
 		cfg.MinNodeChunkSize = 4 * 1024

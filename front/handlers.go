@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/xml"
 	"errors"
 	"io"
 	"net/http"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/schwarzlichtbezirk/dfs/pb"
 	"google.golang.org/grpc/grpclog"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 // API error codes.
@@ -17,9 +19,12 @@ import (
 // so this error code at service reply exactly points to error place.
 const (
 	AECnull = iota
-	AECbadbody
 	AECnoreq
 	AECbadjson
+	AECbadyaml
+	AECbadxml
+	AECargundef
+	AECbadenc
 	AECpanic
 
 	// upload
@@ -56,8 +61,10 @@ const (
 var (
 	ErrNoJSON   = errors.New("data not given")
 	ErrNoData   = errors.New("data is empty")
-	ErrNotFound = errors.New("404 file not found")
+	ErrArgUndef = errors.New("request content type is undefined")
+	ErrBadEnc   = errors.New("encoding format does not supported")
 
+	ErrNotFound = errors.New("404 file not found")
 	ErrArgBadID = errors.New("file ID can not be parsed as an integer")
 	ErrNodeHas  = errors.New("node with given addres already present")
 )
@@ -65,22 +72,27 @@ var (
 // pingAPI is ping helper to check transactions latency and webserver health.
 func pingAPI(w http.ResponseWriter, r *http.Request) {
 	var body, _ = io.ReadAll(r.Body)
+	WriteStdHeader(w)
 	w.WriteHeader(http.StatusOK)
-	WriteJSONHeader(w)
 	w.Write(body)
 }
 
 // nodesizeAPI returns array with sum size of all chunks on each nodes.
 func nodesizeAPI(w http.ResponseWriter, r *http.Request) {
-	_ = r
+	var ret struct {
+		XMLName xml.Name `json:"-" yaml:"-" xml:"ret"`
+
+		List []int64 `json:"list" yaml:"list" xml:"list>size"`
+	}
+
 	storage.nodmux.RLock()
-	var ret = make([]int64, len(storage.Nodes))
+	ret.List = make([]int64, len(storage.Nodes))
 	for i, node := range storage.Nodes {
-		ret[i] = node.SumSize
+		ret.List[i] = node.SumSize
 	}
 	storage.nodmux.RUnlock()
 
-	WriteOK(w, ret)
+	WriteOK(w, r, &ret)
 }
 
 // uploadAPI uploads some file.
@@ -89,7 +101,7 @@ func uploadAPI(w http.ResponseWriter, r *http.Request) {
 
 	var file, handler, err = r.FormFile("datafile")
 	if err != nil {
-		WriteError400(w, err, AECuploadform)
+		WriteError400(w, r, err, AECuploadform)
 		return
 	}
 	defer file.Close()
@@ -291,7 +303,7 @@ func uploadAPI(w http.ResponseWriter, r *http.Request) {
 				node.Client.Remove(ctx, &pb.FileID{Id: rng.FileId})
 			}
 			// write error 500
-			WriteJSON(w, http.StatusInternalServerError, err)
+			WriteRet(w, r, http.StatusInternalServerError, err)
 			return
 		}
 	}
@@ -299,7 +311,7 @@ func uploadAPI(w http.ResponseWriter, r *http.Request) {
 	// save file information at last to get ready for full access after it
 	storage.AddFileInfo(info)
 
-	WriteOK(w, info)
+	WriteOK(w, r, info)
 }
 
 func downloadAPI(w http.ResponseWriter, r *http.Request) {
@@ -309,7 +321,7 @@ func downloadAPI(w http.ResponseWriter, r *http.Request) {
 	var fid int64
 	if s := r.FormValue("id"); len(s) > 0 {
 		if fid, err = strconv.ParseInt(s, 10, 64); err != nil {
-			WriteError400(w, ErrArgBadID, AECdownloadbadid)
+			WriteError400(w, r, ErrArgBadID, AECdownloadbadid)
 			return
 		}
 	}
@@ -319,13 +331,13 @@ func downloadAPI(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if fid == 0 && name == "" {
-		WriteError400(w, ErrNoData, AECdownloadnoarg)
+		WriteError400(w, r, ErrNoData, AECdownloadnoarg)
 		return
 	}
 
 	var info *FileInfo
 	if info = storage.FindFileInfo(fid, name); info == nil {
-		WriteError(w, http.StatusNotFound, ErrNotFound, AECdownloadabsent)
+		WriteError(w, r, http.StatusNotFound, ErrNotFound, AECdownloadabsent)
 		return
 	}
 
@@ -336,23 +348,25 @@ func downloadAPI(w http.ResponseWriter, r *http.Request) {
 func fileinfoAPI(w http.ResponseWriter, r *http.Request) {
 	var err error
 	var arg struct {
-		Name string `json:"name,omitempty"`
-		ID   int64  `json:"id,omitempty"`
+		XMLName xml.Name `json:"-" yaml:"-" xml:"arg"`
+
+		Name string `json:"name,omitempty" yaml:"name,omitempty" xml:"name,omitempty"`
+		ID   int64  `json:"id,omitempty" yaml:"id,omitempty" xml:"id,omitempty"`
 	}
 	var ret *FileInfo
 
 	// get arguments
-	if err = AjaxGetArg(w, r, &arg); err != nil {
+	if err = ParseBody(w, r, &arg); err != nil {
 		return
 	}
 	if arg.ID == 0 && arg.Name == "" {
-		WriteError400(w, ErrNoData, AECfileinfonoarg)
+		WriteError400(w, r, ErrNoData, AECfileinfonoarg)
 		return
 	}
 
 	ret = storage.FindFileInfo(arg.ID, arg.Name)
 
-	WriteOK(w, ret)
+	WriteOK(w, r, ret)
 }
 
 // removeAPI deletes all chunks of pointed file from nodes.
@@ -360,22 +374,24 @@ func fileinfoAPI(w http.ResponseWriter, r *http.Request) {
 func removeAPI(w http.ResponseWriter, r *http.Request) {
 	var err error
 	var arg struct {
-		Name string `json:"name,omitempty"`
-		ID   int64  `json:"id,omitempty"`
+		XMLName xml.Name `json:"-" yaml:"-" xml:"arg"`
+
+		Name string `json:"name,omitempty" yaml:"name,omitempty" xml:"name,omitempty"`
+		ID   int64  `json:"id,omitempty" yaml:"id,omitempty" xml:"id,omitempty"`
 	}
 	var ret *FileInfo
 
 	// get arguments
-	if err = AjaxGetArg(w, r, &arg); err != nil {
+	if err = ParseBody(w, r, &arg); err != nil {
 		return
 	}
 	if arg.ID == 0 && arg.Name == "" {
-		WriteError400(w, ErrNoData, AECremovenoarg)
+		WriteError400(w, r, ErrNoData, AECremovenoarg)
 		return
 	}
 
 	if ret = storage.FindFileInfo(arg.ID, arg.Name); ret == nil {
-		WriteError(w, http.StatusNotFound, ErrNotFound, AECremoveabsent)
+		WriteError(w, r, http.StatusNotFound, ErrNotFound, AECremoveabsent)
 		return
 	}
 
@@ -392,16 +408,15 @@ func removeAPI(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if err != nil {
-		WriteError500(w, err, AECremovegrpc)
+		WriteError500(w, r, err, AECremovegrpc)
 		return
 	}
 
-	WriteOK(w, ret)
+	WriteOK(w, r, ret)
 }
 
 // clearAPI deletes all data at storage, purge nodes, and sets files ID counter to 0.
 func clearAPI(w http.ResponseWriter, r *http.Request) {
-	_ = r
 	var err error
 
 	storage.Clear()
@@ -417,36 +432,42 @@ func clearAPI(w http.ResponseWriter, r *http.Request) {
 		for _, node := range storage.Nodes {
 			ctx, cancel := context.WithTimeout(context.Background(), cfg.ApiTimeout)
 			defer cancel()
-			if _, err1 := node.Client.Purge(ctx, &pb.Empty{}); err1 != nil {
+			if _, err1 := node.Client.Purge(ctx, &emptypb.Empty{}); err1 != nil {
 				err = err1 // save error for future break
 			}
 		}
 	}()
 
 	if err != nil {
-		WriteError500(w, err, AECcleargrpc)
+		WriteError500(w, r, err, AECcleargrpc)
 		return
 	}
 
 	grpclog.Infoln("content is cleared")
 
-	WriteOK(w, nil)
+	WriteOK(w, r, nil)
 }
 
 // addnodeAPI adds new node to composition in runtime and waits until connection will be established.
 func addnodeAPI(w http.ResponseWriter, r *http.Request) {
 	var err error
 	var arg struct {
-		Addr string `json:"addr"`
+		XMLName xml.Name `json:"-" yaml:"-" xml:"arg"`
+
+		Addr string `json:"addr" yaml:"addr" xml:"addr"`
 	}
-	var ret int // index of added node
+	var ret struct {
+		XMLName xml.Name `json:"-" yaml:"-" xml:"ret"`
+
+		Idx int `json:"idx" yaml:"idx" xml:"idx"` // index of added node
+	}
 
 	// get arguments
-	if err = AjaxGetArg(w, r, &arg); err != nil {
+	if err = ParseBody(w, r, &arg); err != nil {
 		return
 	}
 	if arg.Addr == "" {
-		WriteError400(w, ErrNoData, AECaddnodenodata)
+		WriteError400(w, r, ErrNoData, AECaddnodenodata)
 		return
 	}
 
@@ -460,7 +481,7 @@ func addnodeAPI(w http.ResponseWriter, r *http.Request) {
 	}
 	storage.nodmux.RUnlock()
 	if found {
-		WriteError400(w, ErrNodeHas, AECaddnodehas)
+		WriteError400(w, r, ErrNodeHas, AECaddnodehas)
 		return
 	}
 
@@ -470,12 +491,12 @@ func addnodeAPI(w http.ResponseWriter, r *http.Request) {
 	}
 
 	storage.nodmux.Lock()
-	ret = len(storage.Nodes) // get size, it will be index
+	ret.Idx = len(storage.Nodes) // get size, it will be index
 	storage.Nodes = append(storage.Nodes, node)
 	storage.nodmux.Unlock()
 
 	node.RunGRPC()
 	grpcwg.Wait()
 
-	WriteOK(w, ret)
+	WriteOK(w, r, &ret)
 }

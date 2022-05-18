@@ -2,7 +2,7 @@ package main
 
 import (
 	"os"
-	"path/filepath"
+	"path"
 	"time"
 
 	"github.com/jessevdk/go-flags"
@@ -14,12 +14,6 @@ const (
 	gitpath = "github.com/schwarzlichtbezirk/" + gitname
 	cfgfile = "dfs-front.yaml"
 )
-
-// CfgCmdLine is command line arguments managment settings.
-type CfgCmdLine struct {
-	ConfigPath string `json:"-" yaml:"-" env:"CONFIGPATH" short:"c" long:"cfgpath" description:"Configuration path. Can be full path to config folder, or relative from executable destination."`
-	NoConfig   bool   `json:"-" yaml:"-" long:"nocfg" description:"Specifies do not load settings from YAML-settings file, keeps default."`
-}
 
 // CfgWebServ is web server settings.
 type CfgWebServ struct {
@@ -42,7 +36,6 @@ type CfgStorage struct {
 
 // Config is common service settings.
 type Config struct {
-	CfgCmdLine `json:"-" yaml:"-" group:"Command line arguments"`
 	CfgWebServ `json:"web-server" yaml:"web-server" group:"Web Server"`
 	CfgStorage `json:"storage" yaml:"storage" group:"Storage"`
 	// list of nodes
@@ -86,7 +79,7 @@ func init() {
 // ReadYaml reads "data" object from YAML-file with given file name.
 func ReadYaml(fname string, data interface{}) (err error) {
 	var body []byte
-	if body, err = os.ReadFile(filepath.Join(ConfigPath, fname)); err != nil {
+	if body, err = os.ReadFile(path.Join(ConfigPath, fname)); err != nil {
 		return
 	}
 	if err = yaml.Unmarshal(body, data); err != nil {

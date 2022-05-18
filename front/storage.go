@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/xml"
 	"errors"
 	"io"
 	"mime/multipart"
@@ -16,11 +17,13 @@ import (
 
 // FileInfo is file information about chunks placed at nodes.
 type FileInfo struct {
-	FileID int64       `json:"file_id"`
-	Name   string      `json:"name"`
-	Size   int64       `json:"size"`
-	MIME   string      `json:"mime"`
-	Chunks []*pb.Range `json:"chunks"`
+	XMLName xml.Name `json:"-" yaml:"-" xml:"fi"`
+
+	FileID int64       `json:"file_id" yaml:"file_id" xml:"file_id"`
+	Name   string      `json:"name" yaml:"name" xml:"name"`
+	Size   int64       `json:"size" yaml:"size" xml:"size"`
+	MIME   string      `json:"mime" yaml:"mime" xml:"mime"`
+	Chunks []*pb.Range `json:"chunks" yaml:"chunks" xml:"chunks>range"`
 }
 
 type NodeInfo struct {

@@ -70,6 +70,7 @@ If you want to modify `.go`-code and `.proto` file, you should [download](https:
 ```batch
 go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
 go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+go install github.com/srikrsna/protoc-gen-gotag@latest
 ```
 
 To generate protocol buffer code, run `task/pb.cmd` batch file.
@@ -85,7 +86,7 @@ REST API can be tested by `curl` tool. There is no need to write some module tha
 ### Detect used volume on each node
 
 ```batch
-curl -X GET localhost:8008/api/v0/nodesize
+curl -X GET localhost:8008/api/nodesize
 ```
 
 Returns integers array with node total data size in each value. Index of each value in array fits to node index.
@@ -93,7 +94,7 @@ Returns integers array with node total data size in each value. Index of each va
 ### Upload file
 
 ```batch
-curl -i -X POST -H "Content-Type: multipart/form-data" -F "datafile=@H:\src\IMG_20200519_145112.jpg" localhost:8008/api/v0/upload
+curl -i -X POST -H "Content-Type: multipart/form-data" -F "datafile=@H:\src\IMG_20200519_145112.jpg" localhost:8008/api/upload
 ```
 
 `datafile` here can be some other valid destination path to file.
@@ -102,20 +103,20 @@ Application architecture allows uploading multiple files with the same name. It 
 ### Download file
 
 To view previous uploaded image in browser, follow those URL:
-<http://localhost:8010/api/v0/download?id=1>
+<http://localhost:8010/api/download?id=1>
 or
-<http://localhost:8010/api/v0/download?name=IMG_20200519_145112.jpg>
+<http://localhost:8010/api/download?name=IMG_20200519_145112.jpg>
 
 ### Get information about file chunks
 
 ```batch
-curl -X GET localhost:8008/api/v0/fileinfo -d "{\"id\":1}"
+curl -X GET localhost:8008/api/fileinfo -d "{\"id\":1}"
 ```
 
 or
 
 ```batch
-curl -X GET localhost:8008/api/v0/fileinfo -d "{\"name\":\"IMG_20200519_145112.jpg\"}"
+curl -X GET localhost:8008/api/fileinfo -d "{\"name\":\"IMG_20200519_145112.jpg\"}"
 ```
 
 Returns array of chunks properties for file with given `id` or given `name`. Since there can be multiple files uploaded with the same name, and if `name` is pointed, it returns properties of first founded file with given name. Returns `null` if file was not found.
@@ -123,13 +124,13 @@ Returns array of chunks properties for file with given `id` or given `name`. Sin
 ### Remove file from storage
 
 ```batch
-curl -X POST localhost:8008/api/v0/remove -d "{\"id\":1}"
+curl -X POST localhost:8008/api/remove -d "{\"id\":1}"
 ```
 
 or
 
 ```batch
-curl -X POST localhost:8008/api/v0/remove -d "{\"name\":\"IMG_20200519_145112.jpg\"}"
+curl -X POST localhost:8008/api/remove -d "{\"name\":\"IMG_20200519_145112.jpg\"}"
 ```
 
 Deletes all chunks on nodes and information about file with given `id` or given `name`. Returns array of chunks properties of deleted file. Returns `null` if file was not found.
@@ -137,7 +138,7 @@ Deletes all chunks on nodes and information about file with given `id` or given 
 ### Add new node at runtime
 
 ```batch
-curl -X GET localhost:8008/api/v0/addnode -d "{\"addr\":\":50053\"}"
+curl -X GET localhost:8008/api/addnode -d "{\"addr\":\":50053\"}"
 ```
 
 Adds new node during service is running. Transaction waits util gRPC connection will be established, and then returns index of added node.
@@ -147,73 +148,73 @@ Adds new node during service is running. Transaction waits util gRPC connection 
 1. Upload some first images:
 
 ```batch
-curl -i -X POST -H "Content-Type: multipart/form-data" -F "datafile=@H:\src\IMG_20200519_145112.jpg" localhost:8010/api/v0/upload
+curl -i -X POST -H "Content-Type: multipart/form-data" -F "datafile=@H:\src\IMG_20200519_145112.jpg" localhost:8010/api/upload
 ```
 
 2. Check up data volumes used by nodes:
 
 ```batch
-curl -X GET localhost:8010/api/v0/nodesize
+curl -X GET localhost:8010/api/nodesize
 ```
 
 3. Start new node instance and add it to composition in runtime:
 
 ```batch
 start "node#new" dfs.node.x64.exe -p :50080
-curl -X POST localhost:8008/api/v0/addnode -d "{\"addr\":\":50080\"}"
+curl -X POST localhost:8008/api/addnode -d "{\"addr\":\":50080\"}"
 ```
 
 4. Upload some second image. Percent for new node will be larger:
 
 ```batch
-curl -i -X POST -H "Content-Type: multipart/form-data" -F "datafile=@H:\src\IMG_20200519_145207.jpg" localhost:8010/api/v0/upload
+curl -i -X POST -H "Content-Type: multipart/form-data" -F "datafile=@H:\src\IMG_20200519_145207.jpg" localhost:8010/api/upload
 ```
 
 5. Check up data volumes used by nodes again:
 
 ```batch
-curl -X GET localhost:8010/api/v0/nodesize
+curl -X GET localhost:8010/api/nodesize
 ```
 
 6. View those images in browser by followed links:
 
-[IMG_20200519_145112.jpg](http://localhost:8010/api/v0/download?id=1) and
-[IMG_20200519_145207.jpg](http://localhost:8010/api/v0/download?id=2)
+[IMG_20200519_145112.jpg](http://localhost:8010/api/download?id=1) and
+[IMG_20200519_145207.jpg](http://localhost:8010/api/download?id=2)
 
 7. Remove 1st image from storage:
 
 ```batch
-curl -X POST localhost:8010/api/v0/remove -d "{\"id\":1}"
+curl -X POST localhost:8010/api/remove -d "{\"id\":1}"
 ```
 
 8. Check up data volumes again after it:
 
 ```batch
-curl -X GET localhost:8010/api/v0/nodesize
+curl -X GET localhost:8010/api/nodesize
 ```
 
 9. Try to get file info for removed file:
 
 ```batch
-curl -X GET localhost:8010/api/v0/fileinfo -d "{\"id\":1}"
+curl -X GET localhost:8010/api/fileinfo -d "{\"id\":1}"
 ```
 
 10. View file info for second image remaining in storage:
 
 ```batch
-curl -X GET localhost:8010/api/v0/fileinfo -d "{\"id\":2}"
+curl -X GET localhost:8010/api/fileinfo -d "{\"id\":2}"
 ```
 
 11. Clear data storage:
 
 ```batch
-curl -X PUT localhost:8010/api/v0/clear
+curl -X PUT localhost:8010/api/clear
 ```
 
 12. Check up data volumes is zero:
 
 ```batch
-curl -X GET localhost:8010/api/v0/nodesize
+curl -X GET localhost:8010/api/nodesize
 ```
 
 ---
