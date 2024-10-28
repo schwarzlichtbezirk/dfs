@@ -3,7 +3,7 @@
 ##
 
 # Use image with golang last version as builder.
-FROM golang:1.17-bullseye AS build
+FROM golang:1.23-bullseye AS build
 
 # See https://stackoverflow.com/questions/64462922/docker-multi-stage-build-go-image-x509-certificate-signed-by-unknown-authorit
 RUN apt-get update && apt-get install -y ca-certificates openssl
@@ -18,7 +18,7 @@ RUN update-ca-certificates
 # Make project root folder as current dir.
 WORKDIR $GOPATH/src/github.com/schwarzlichtbezirk/dfs/
 # Copy only go.mod and go.sum to prevent downloads all dependencies again on any code changes.
-COPY go.* .
+COPY go.mod go.sum ./
 # Download all dependencies pointed at go.mod file.
 RUN go mod download
 # Copy all files and subfolders in current state as is.
